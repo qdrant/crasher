@@ -19,6 +19,8 @@ Options:
           Working directory for Qdrant data
       --exec-path <EXEC_PATH>
           Path to executable binary relative to `working_dir`
+      --crash-probability <CRASH_PROBABILITY>
+          Probability to kill running instance [default: 0.1]
       --uris <URIS>
           Qdrant gRPC service URIs (can be used several times to specify several URIs) [default: http://localhost:6334]
       --replication-factor <REPLICATION_FACTOR>
@@ -36,7 +38,7 @@ Options:
   -h, --help
           Print help
   -V, --version
-
+          Print version
 ```
 
 Example:

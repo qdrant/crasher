@@ -8,8 +8,9 @@ use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
-    CreateCollection, Distance, OptimizersConfigDiff, PointId, PointStruct, QuantizationConfig,
-    ScalarQuantization, SearchPoints, SearchResponse, VectorParams, VectorsConfig, WriteOrdering,
+    CollectionInfo, CreateCollection, Distance, HnswConfigDiff, OptimizersConfigDiff, PointId,
+    PointStruct, QuantizationConfig, ScalarQuantization, SearchPoints, SearchResponse,
+    VectorParams, VectorsConfig, WriteOrdering,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -36,6 +37,23 @@ pub async fn wait_server_ready(
         }
     }
     Ok(start.elapsed().as_secs_f64())
+}
+
+/// Get points count
+pub async fn get_collection_info(
+    client: &QdrantClient,
+    collection_name: &str,
+) -> Result<CollectionInfo, anyhow::Error> {
+    let collection_info = client
+        .collection_info(collection_name)
+        .await
+        .context(format!(
+            "Failed to fetch collection info for {}",
+            collection_name
+        ))?
+        .result
+        .unwrap();
+    Ok(collection_info)
 }
 
 /// Search points
@@ -81,7 +99,7 @@ pub async fn create_collection(
             vectors_config: Some(VectorsConfig {
                 config: Some(Config::Params(VectorParams {
                     size: vec_dim as u64,
-                    distance: Distance::Cosine.into(),
+                    distance: Distance::Dot.into(), // make configurable
                     hnsw_config: None,
                     quantization_config: None,
                 })),
@@ -104,6 +122,14 @@ pub async fn create_collection(
             } else {
                 None
             },
+            hnsw_config: Some(HnswConfigDiff {
+                m: Some(32),
+                ef_construct: None,
+                full_scan_threshold: None,
+                max_indexing_threads: None,
+                on_disk: Some(true), // make configurable
+                payload_m: None,
+            }),
             ..Default::default()
         })
         .await

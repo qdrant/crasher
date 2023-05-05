@@ -11,7 +11,7 @@ pub struct Args {
     #[arg(long)]
     pub exec_path: String,
     /// Probability to kill running instance
-    #[arg(long, default_value_t = 0.2)]
+    #[arg(long, default_value_t = 0.1)]
     pub crash_probability: f64,
     /// Qdrant gRPC service URIs (can be used several times to specify several URIs)
     #[arg(long, default_value = "http://localhost:6334")]

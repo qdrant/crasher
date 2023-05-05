@@ -32,11 +32,17 @@ impl ProcessManager {
         })
     }
 
+    // Doc says: This is equivalent to sending a SIGKILL on unix platforms.
     pub async fn kill_process(&mut self) {
         self.child_process.kill().await.unwrap();
     }
 
-    pub async fn chaos(&mut self, stopped: Arc<AtomicBool>, client: &QdrantClient, crash_probability: f64) {
+    pub async fn chaos(
+        &mut self,
+        stopped: Arc<AtomicBool>,
+        client: &QdrantClient,
+        crash_probability: f64,
+    ) {
         loop {
             if stopped.load(Ordering::SeqCst) {
                 break;

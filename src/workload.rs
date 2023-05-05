@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::time::sleep;
 
 use crate::args::Args;
-use crate::client::{create_collection, insert_points_batch, search_points};
+use crate::client::{create_collection, get_collection_info, insert_points_batch, search_points};
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client};
 
@@ -23,8 +23,8 @@ impl Workload {
         let collection_name = "workload-crasher".to_string();
         let vec_dim = 1024;
         let payload_count = 2;
-        let search_count = 10;
-        let points_count = 100000;
+        let search_count = 100;
+        let points_count = 1_000_000;
         Workload {
             collection_name,
             search_count,
@@ -67,6 +67,8 @@ impl Workload {
         if !client.has_collection(&self.collection_name).await? {
             log::info!("Creating workload collection");
             create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
+            let collection_info = get_collection_info(client, &self.collection_name).await?;
+            log::info!("Collection info: {:?}", collection_info);
         }
 
         log::info!("Run pre-search");

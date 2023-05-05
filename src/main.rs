@@ -51,7 +51,10 @@ async fn main() {
                         log::error!("Failed to wait for qdrant to be ready: {}", e);
                         exit(1)
                     }
-                    log::info!("Qdrant is ready! Crashing it with probability {}", crash_probability);
+                    log::info!(
+                        "Qdrant is ready! Crashing it with probability {}",
+                        crash_probability
+                    );
 
                     // workload task
                     let client_worker = client.clone();
