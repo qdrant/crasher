@@ -1,13 +1,17 @@
 use anyhow::Result;
 use qdrant_client::client::QdrantClient;
+use qdrant_client::qdrant::FieldType;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::time::sleep;
 
 use crate::args::Args;
-use crate::client::{create_collection, get_collection_info, insert_points_batch, search_points};
+use crate::client::{
+    create_collection, create_field_index, get_collection_info, insert_points_batch, search_points,
+};
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client};
+use crate::generators::KEYWORD_PAYLOAD_KEY;
 
 pub struct Workload {
     collection_name: String,
@@ -67,6 +71,13 @@ impl Workload {
         if !client.has_collection(&self.collection_name).await? {
             log::info!("Creating workload collection");
             create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
+            create_field_index(
+                client,
+                &self.collection_name,
+                KEYWORD_PAYLOAD_KEY,
+                FieldType::Keyword,
+            )
+            .await?;
             let collection_info = get_collection_info(client, &self.collection_name).await?;
             log::info!("Collection info: {:?}", collection_info);
         }

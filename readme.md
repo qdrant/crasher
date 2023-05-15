@@ -41,9 +41,12 @@ Options:
           Print version
 ```
 
-Example:
+Examples:
 
 ```bash
 cargo run -- --working-dir "/home/agourlay/Workspace/qdrant/" --exec-path "target/debug/qdrant"
 ```
 
+```bash
+cargo run -r -- --working-dir "/home/agourlay/Workspace/qdrant/" --exec-path "target/release/qdrant" --indexing-threshold 2000 --memmap-threshold 2000
+```

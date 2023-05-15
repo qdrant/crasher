@@ -8,8 +8,8 @@ use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
-    CollectionInfo, CreateCollection, Distance, HnswConfigDiff, OptimizersConfigDiff, PointId,
-    PointStruct, QuantizationConfig, ScalarQuantization, SearchPoints, SearchResponse,
+    CollectionInfo, CreateCollection, Distance, FieldType, HnswConfigDiff, OptimizersConfigDiff,
+    PointId, PointStruct, QuantizationConfig, ScalarQuantization, SearchPoints, SearchResponse,
     VectorParams, VectorsConfig, WriteOrdering,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -179,5 +179,27 @@ pub async fn insert_points_batch(
                 batch_size, batch_id, num_batches, collection_name
             ))?;
     }
+    Ok(())
+}
+
+pub async fn create_field_index(
+    client: &QdrantClient,
+    collection_name: &str,
+    field_name: &str,
+    field_type: FieldType,
+) -> Result<(), anyhow::Error> {
+    client
+        .create_field_index_blocking(
+            collection_name.to_string(),
+            field_name.to_string(),
+            field_type,
+            None,
+            None,
+        )
+        .await
+        .context(format!(
+            "Failed to create field index {} for collection {}",
+            field_name, collection_name
+        ))?;
     Ok(())
 }
