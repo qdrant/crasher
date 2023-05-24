@@ -102,6 +102,7 @@ pub async fn create_collection(
                     distance: Distance::Dot.into(), // make configurable
                     hnsw_config: None,
                     quantization_config: None,
+                    on_disk: None,
                 })),
             }),
             replication_factor: Some(args.replication_factor as u32),

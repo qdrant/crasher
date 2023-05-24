@@ -33,7 +33,7 @@ async fn main() {
     .expect("Error setting Ctrl-C handler");
 
     let client_config = get_config(args.uris.first().unwrap(), args.grpc_timeout_ms);
-    let client = QdrantClient::new(Some(client_config)).await.unwrap();
+    let client = QdrantClient::new(Some(client_config)).unwrap();
     let client = Arc::new(client).clone();
     let args = Arc::new(args);
     let crash_probability = args.crash_probability;
