@@ -31,6 +31,9 @@ pub struct Args {
     /// Whether to use scalar quantization for vectors
     #[arg(long, default_value_t = true)]
     pub use_scalar_quantization: bool,
+    /// If true - serve vectors from disk. If set to false, the vectors will be loaded in RAM.
+    #[arg(long, default_value_t = false)]
+    pub vectors_on_disk: bool,
     /// Timeout of gRPC client
     #[arg(long, default_value_t = 2000)]
     pub grpc_timeout_ms: usize,

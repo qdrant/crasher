@@ -5,12 +5,13 @@ use crate::generators::{random_filter, random_payload, random_vector};
 use anyhow::Context;
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
+use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
     CollectionInfo, CreateCollection, Distance, FieldType, HnswConfigDiff, OptimizersConfigDiff,
-    PointId, PointStruct, QuantizationConfig, ScalarQuantization, SearchPoints, SearchResponse,
-    VectorParams, VectorsConfig, WriteOrdering,
+    PointId, PointStruct, PointsIdsList, PointsSelector, QuantizationConfig, ScalarQuantization,
+    SearchPoints, SearchResponse, VectorParams, VectorsConfig, WriteOrdering,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -54,6 +55,24 @@ pub async fn get_collection_info(
         .result
         .unwrap();
     Ok(collection_info)
+}
+
+/// Get points count
+pub async fn get_points_count(
+    client: &QdrantClient,
+    collection_name: &str,
+) -> Result<usize, anyhow::Error> {
+    let point_count = client
+        .collection_info(collection_name)
+        .await
+        .context(format!(
+            "Failed to fetch points count for {}",
+            collection_name
+        ))?
+        .result
+        .unwrap()
+        .points_count;
+    Ok(point_count as usize)
 }
 
 /// Search points
@@ -100,9 +119,26 @@ pub async fn create_collection(
                 config: Some(Config::Params(VectorParams {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(), // make configurable
-                    hnsw_config: None,
-                    quantization_config: None,
-                    on_disk: None,
+                    quantization_config: if args.use_scalar_quantization {
+                        Some(QuantizationConfig {
+                            quantization: Some(Quantization::Scalar(ScalarQuantization {
+                                r#type: 1, //Int8
+                                quantile: None,
+                                always_ram: Some(true),
+                            })),
+                        })
+                    } else {
+                        None
+                    },
+                    hnsw_config: Some(HnswConfigDiff {
+                        m: Some(32),
+                        ef_construct: None,
+                        full_scan_threshold: None,
+                        max_indexing_threads: None,
+                        on_disk: Some(true), // make configurable
+                        payload_m: None,
+                    }),
+                    on_disk: Some(args.vectors_on_disk),
                 })),
             }),
             replication_factor: Some(args.replication_factor as u32),
@@ -111,25 +147,6 @@ pub async fn create_collection(
                 indexing_threshold: args.indexing_threshold.map(|i| i as u64),
                 memmap_threshold: args.memmap_threshold.map(|i| i as u64),
                 ..Default::default()
-            }),
-            quantization_config: if args.use_scalar_quantization {
-                Some(QuantizationConfig {
-                    quantization: Some(Quantization::Scalar(ScalarQuantization {
-                        r#type: 1, //Int8
-                        quantile: None,
-                        always_ram: Some(true),
-                    })),
-                })
-            } else {
-                None
-            },
-            hnsw_config: Some(HnswConfigDiff {
-                m: Some(32),
-                ef_construct: None,
-                full_scan_threshold: None,
-                max_indexing_threads: None,
-                on_disk: Some(true), // make configurable
-                payload_m: None,
             }),
             ..Default::default()
         })
@@ -203,4 +220,42 @@ pub async fn create_field_index(
             field_name, collection_name
         ))?;
     Ok(())
+}
+
+/// Set payload (blocking)
+pub async fn set_payload(
+    client: &QdrantClient,
+    collection_name: &str,
+    point_id: u64,
+    payload_count: usize,
+    write_ordering: Option<WriteOrdering>,
+) -> Result<(), anyhow::Error> {
+    let payload = random_payload(Some(payload_count));
+
+    let points_id_selector = vec![PointId {
+        point_id_options: Some(PointIdOptions::Num(point_id)),
+    }];
+
+    let points_selector = &PointsSelector {
+        points_selector_one_of: Some(PointsSelectorOneOf::Points(PointsIdsList {
+            ids: points_id_selector,
+        })),
+    };
+
+    let resp = client
+        .set_payload_blocking(collection_name, points_selector, payload, write_ordering)
+        .await
+        .context(format!(
+            "Failed to set payload for {} with payload_count {}",
+            point_id, payload_count
+        ))?;
+    if resp.result.unwrap().status != 2 {
+        Err(anyhow::anyhow!(
+            "Failed to set payload on point_id {} for {}",
+            point_id,
+            collection_name
+        ))
+    } else {
+        Ok(())
+    }
 }

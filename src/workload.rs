@@ -1,16 +1,17 @@
 use anyhow::Result;
 use qdrant_client::client::QdrantClient;
-use qdrant_client::qdrant::FieldType;
+use qdrant_client::qdrant::{FieldType, WriteOrdering};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::time::sleep;
 
 use crate::args::Args;
 use crate::client::{
-    create_collection, create_field_index, get_collection_info, insert_points_batch, search_points,
+    create_collection, create_field_index, get_collection_info, get_points_count,
+    insert_points_batch, search_points, set_payload,
 };
 use crate::crasher_error::CrasherError;
-use crate::crasher_error::CrasherError::{Cancelled, Client};
+use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
 use crate::generators::KEYWORD_PAYLOAD_KEY;
 
 pub struct Workload {
@@ -19,6 +20,7 @@ pub struct Workload {
     points_count: usize,
     vec_dim: usize,
     payload_count: usize,
+    write_ordering: Option<WriteOrdering>,
     stopped: Arc<AtomicBool>,
 }
 
@@ -28,13 +30,15 @@ impl Workload {
         let vec_dim = 1024;
         let payload_count = 2;
         let search_count = 100;
-        let points_count = 1_000_000;
+        let points_count = 20_000;
+        let write_ordering = None; // default
         Workload {
             collection_name,
             search_count,
             points_count,
             vec_dim,
             payload_count,
+            write_ordering,
             stopped,
         }
     }
@@ -53,6 +57,12 @@ impl Workload {
                 }
                 Err(Cancelled) => {
                     log::info!("Workload run cancelled");
+                    break;
+                }
+                Err(Invariant(msg)) => {
+                    log::error!("Workload run failed with violation: {}", msg);
+                    // send stop signal to the main thread
+                    self.stopped.store(true, Ordering::SeqCst);
                     break;
                 }
                 Err(Client(error)) => {
@@ -82,8 +92,34 @@ impl Workload {
             log::info!("Collection info: {:?}", collection_info);
         }
 
-        log::info!("Run pre-search");
-        // search `search_count` times
+        log::info!("Insert points");
+        insert_points_batch(
+            client,
+            &self.collection_name,
+            self.points_count,
+            self.vec_dim,
+            0, // no payload at first
+            None,
+            self.stopped.clone(),
+        )
+        .await?;
+
+        log::info!("Run set_payload");
+        for point_id in 1..self.points_count {
+            if self.stopped.load(Ordering::Relaxed) {
+                return Err(Cancelled);
+            }
+            set_payload(
+                client,
+                &self.collection_name,
+                point_id as u64,
+                self.payload_count,
+                self.write_ordering.clone(),
+            )
+            .await?;
+        }
+
+        log::info!("Run post-search");
         for _i in 0..self.search_count {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
@@ -97,32 +133,13 @@ impl Workload {
             .await?;
         }
 
-        log::info!("Insert points");
-        // insert some points
-        insert_points_batch(
-            client,
-            &self.collection_name,
-            self.points_count,
-            self.vec_dim,
-            self.payload_count,
-            None,
-            self.stopped.clone(),
-        )
-        .await?;
-
-        log::info!("Run post-search");
-        // search `search_count` times
-        for _i in 0..self.search_count {
-            if self.stopped.load(Ordering::Relaxed) {
-                return Err(Cancelled);
-            }
-            search_points(
-                client,
-                &self.collection_name,
-                self.vec_dim,
-                self.payload_count,
-            )
-            .await?;
+        log::info!("Run post_count");
+        let points_count = get_points_count(client, &self.collection_name).await?;
+        if points_count != self.points_count {
+            return Err(Invariant(format!(
+                "Collection has wrong number of points after insert {} vs {}",
+                points_count, self.points_count
+            )));
         }
 
         log::info!("Workload finished");

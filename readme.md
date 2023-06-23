@@ -33,6 +33,8 @@ Options:
           Maximum size (in KiloBytes) of vectors to store in-memory per segment
       --use-scalar-quantization
           Whether to use scalar quantization for vectors
+      --vectors-on-disk
+          If true - serve vectors from disk. If set to false, the vectors will be loaded in RAM
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
           Timeout of gRPC client [default: 2000]
   -h, --help

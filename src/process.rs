@@ -61,6 +61,7 @@ impl ProcessManager {
                 }
                 log::info!("Qdrant is ready!");
             }
+            // wait a bit before next chaos
             sleep(Duration::from_secs(5)).await;
         }
     }
