@@ -1,7 +1,7 @@
 use crate::args::Args;
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::Cancelled;
-use crate::generators::{random_filter, random_payload, random_vector};
+use crate::generators::{random_dense_vector, random_filter, random_payload, random_sparse_vector};
 use anyhow::Context;
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
@@ -11,8 +11,10 @@ use qdrant_client::qdrant::vectors_config::Config;
 use qdrant_client::qdrant::{
     CollectionInfo, CreateCollection, Distance, FieldType, HnswConfigDiff, OptimizersConfigDiff,
     PointId, PointStruct, PointsIdsList, PointsSelector, QuantizationConfig, ScalarQuantization,
-    SearchPoints, SearchResponse, VectorParams, VectorsConfig, WriteOrdering,
+    SearchPoints, SearchResponse, SparseIndexConfig, SparseVectorConfig, SparseVectorParams,
+    Vector, VectorParams, Vectors, VectorsConfig, WriteOrdering,
 };
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -72,8 +74,10 @@ pub async fn get_points_count(
         .result
         .unwrap()
         .points_count;
-    Ok(point_count as usize)
+    Ok(point_count.unwrap_or_default() as usize)
 }
+
+pub const SPARSE_VECTOR_NAME: &str = "sparse-name";
 
 /// Search points
 pub async fn search_points(
@@ -82,7 +86,10 @@ pub async fn search_points(
     vec_dim: usize,
     payload_count: usize,
 ) -> Result<SearchResponse, anyhow::Error> {
-    let query_vector = random_vector(vec_dim);
+    let sparse_vector: Vector = random_sparse_vector(vec_dim, 0.2).into();
+    let query_vector = sparse_vector.data;
+    let sparse_indices = sparse_vector.indices;
+
     let query_filter = random_filter(Some(payload_count));
 
     let response = client
@@ -95,9 +102,12 @@ pub async fn search_points(
             params: None,
             score_threshold: None,
             offset: None,
-            vector_name: None,
+            vector_name: Some("0".to_string()),
             with_vectors: None,
             read_consistency: None,
+            shard_key_selector: None,
+            sparse_indices,
+            timeout: None,
         })
         .await
         .context(format!("Failed to search points on {}", collection_name))?;
@@ -112,42 +122,33 @@ pub async fn create_collection(
     vec_dim: usize,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
+    let sparse_vectors_config = {
+        let params = vec![(
+            SPARSE_VECTOR_NAME.to_string(),
+            SparseVectorParams {
+                index: Some(SparseIndexConfig {
+                    full_scan_threshold: None,
+                    on_disk: Some(true),
+                }),
+            },
+        )]
+        .into_iter()
+        .collect();
+
+        Some(SparseVectorConfig { map: params })
+    };
+
     client
         .create_collection(&CreateCollection {
             collection_name: collection_name.to_string(),
-            vectors_config: Some(VectorsConfig {
-                config: Some(Config::Params(VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(), // make configurable
-                    quantization_config: if args.use_scalar_quantization {
-                        Some(QuantizationConfig {
-                            quantization: Some(Quantization::Scalar(ScalarQuantization {
-                                r#type: 1, //Int8
-                                quantile: None,
-                                always_ram: Some(true),
-                            })),
-                        })
-                    } else {
-                        None
-                    },
-                    hnsw_config: Some(HnswConfigDiff {
-                        m: Some(32),
-                        ef_construct: None,
-                        full_scan_threshold: None,
-                        max_indexing_threads: None,
-                        on_disk: Some(true), // make configurable
-                        payload_m: None,
-                    }),
-                    on_disk: Some(args.vectors_on_disk),
-                })),
-            }),
             replication_factor: Some(args.replication_factor as u32),
             write_consistency_factor: Some(args.write_consistency_factor as u32),
             optimizers_config: Some(OptimizersConfigDiff {
                 indexing_threshold: args.indexing_threshold.map(|i| i as u64),
-                memmap_threshold: args.memmap_threshold.map(|i| i as u64),
+                memmap_threshold: Some(1000),
                 ..Default::default()
             }),
+            sparse_vectors_config,
             ..Default::default()
         })
         .await
@@ -178,9 +179,16 @@ pub async fn insert_points_batch(
                 point_id_options: Some(PointIdOptions::Num(idx)),
             };
 
+            let mut vectors_map: HashMap<String, Vector> = vec![(
+                SPARSE_VECTOR_NAME.to_string(),
+                random_sparse_vector(vec_dim, 0.3).into(),
+            )]
+            .into_iter()
+            .collect();
+            let vectors: Vectors = vectors_map.into();
             points.push(PointStruct::new(
                 point_id,
-                random_vector(vec_dim),
+                vectors,
                 random_payload(Some(payload_count)),
             ));
         }
@@ -190,7 +198,7 @@ pub async fn insert_points_batch(
 
         // push batch blocking
         client
-            .upsert_points_blocking(collection_name, points, write_ordering.clone())
+            .upsert_points_blocking(collection_name, None, points, write_ordering.clone())
             .await
             .context(format!(
                 "Failed to insert {} points (batch {}/{}) into {}",
@@ -243,7 +251,13 @@ pub async fn set_payload(
     };
 
     let resp = client
-        .set_payload_blocking(collection_name, points_selector, payload, write_ordering)
+        .set_payload_blocking(
+            collection_name,
+            None,
+            points_selector,
+            payload,
+            write_ordering,
+        )
         .await
         .context(format!(
             "Failed to set payload for {} with payload_count {}",

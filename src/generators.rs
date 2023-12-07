@@ -54,7 +54,24 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
     }
 }
 
-pub fn random_vector(dim: usize) -> Vec<f32> {
+pub fn random_dense_vector(dim: usize) -> Vec<f32> {
     let mut rng = rand::thread_rng();
     (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect()
+}
+
+pub fn random_sparse_vector(max_size: usize, sparsity: f64) -> Vec<(u32, f32)> {
+    let mut rng = rand::thread_rng();
+    let size = rng.gen_range(1..max_size);
+    // (index, value)
+    let mut pairs = Vec::with_capacity(size);
+    for i in 1..=size {
+        // probability of skipping a dimension to make the vectors sparse
+        let skip = !rng.gen_bool(sparsity);
+        if skip {
+            continue;
+        }
+        // Only positive values are generated to make sure to hit the pruning path.
+        pairs.push((i as u32, rng.gen_range(0.0..10.0) as f32));
+    }
+    pairs
 }
