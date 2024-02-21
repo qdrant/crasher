@@ -44,7 +44,7 @@ impl ProcessManager {
         crash_probability: f64,
     ) {
         loop {
-            if stopped.load(Ordering::SeqCst) {
+            if stopped.load(Ordering::Relaxed) {
                 break;
             }
 

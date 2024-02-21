@@ -1,18 +1,23 @@
 use crate::args::Args;
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::Cancelled;
-use crate::generators::{random_filter, random_payload, random_dense_vector};
+use crate::generators::{
+    random_dense_vector, random_filter, random_payload, random_sparse_vector, DENSE_VECTOR_NAME,
+    SPARSE_VECTOR_NAME,
+};
 use anyhow::Context;
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::quantization_config::Quantization;
-use qdrant_client::qdrant::vectors_config::Config;
+use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
 use qdrant_client::qdrant::{
     CollectionInfo, CreateCollection, Distance, FieldType, HnswConfigDiff, OptimizersConfigDiff,
     PointId, PointStruct, PointsIdsList, PointsSelector, QuantizationConfig, ScalarQuantization,
-    SearchPoints, SearchResponse, VectorParams, VectorsConfig, WriteOrdering,
+    SearchPoints, SearchResponse, SparseIndexConfig, SparseVectorConfig, SparseVectorParams,
+    Vector, VectorParams, VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -89,13 +94,13 @@ pub async fn search_points(
         .search_points(&SearchPoints {
             collection_name: collection_name.to_string(),
             vector: query_vector,
+            vector_name: Some(DENSE_VECTOR_NAME.to_string()),
             filter: query_filter,
             limit: 100,
             with_payload: Some(true.into()),
             params: None,
             score_threshold: None,
             offset: None,
-            vector_name: None,
             with_vectors: None,
             read_consistency: None,
             timeout: None,
@@ -115,35 +120,63 @@ pub async fn create_collection(
     vec_dim: usize,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
+    let sparse_vectors_config = {
+        let params = vec![(
+            SPARSE_VECTOR_NAME.to_string(),
+            SparseVectorParams {
+                index: Some(SparseIndexConfig {
+                    full_scan_threshold: None,
+                    on_disk: Some(true),
+                }),
+            },
+        )]
+        .into_iter()
+        .collect();
+
+        Some(SparseVectorConfig { map: params })
+    };
+
+    let dense_vectors_config = {
+        let params: HashMap<_, _> = vec![(
+            DENSE_VECTOR_NAME.to_string(),
+            VectorParams {
+                size: vec_dim as u64,
+                distance: Distance::Dot.into(), // make configurable
+                quantization_config: if args.use_scalar_quantization {
+                    Some(QuantizationConfig {
+                        quantization: Some(Quantization::Scalar(ScalarQuantization {
+                            r#type: 1, //Int8
+                            quantile: None,
+                            always_ram: Some(true),
+                        })),
+                    })
+                } else {
+                    None
+                },
+                hnsw_config: Some(HnswConfigDiff {
+                    m: Some(32),
+                    ef_construct: None,
+                    full_scan_threshold: None,
+                    max_indexing_threads: None,
+                    on_disk: Some(true), // make configurable
+                    payload_m: None,
+                }),
+                on_disk: Some(args.vectors_on_disk),
+            },
+        )]
+        .into_iter()
+        .collect();
+
+        Some(VectorsConfig {
+            config: Some(ParamsMap(VectorParamsMap { map: params })),
+        })
+    };
+
     client
         .create_collection(&CreateCollection {
             collection_name: collection_name.to_string(),
-            vectors_config: Some(VectorsConfig {
-                config: Some(Config::Params(VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(), // make configurable
-                    quantization_config: if args.use_scalar_quantization {
-                        Some(QuantizationConfig {
-                            quantization: Some(Quantization::Scalar(ScalarQuantization {
-                                r#type: 1, //Int8
-                                quantile: None,
-                                always_ram: Some(true),
-                            })),
-                        })
-                    } else {
-                        None
-                    },
-                    hnsw_config: Some(HnswConfigDiff {
-                        m: Some(32),
-                        ef_construct: None,
-                        full_scan_threshold: None,
-                        max_indexing_threads: None,
-                        on_disk: Some(true), // make configurable
-                        payload_m: None,
-                    }),
-                    on_disk: Some(args.vectors_on_disk),
-                })),
-            }),
+            vectors_config: dense_vectors_config,
+            sparse_vectors_config,
             replication_factor: Some(args.replication_factor as u32),
             write_consistency_factor: Some(args.write_consistency_factor as u32),
             optimizers_config: Some(OptimizersConfigDiff {
@@ -181,9 +214,25 @@ pub async fn insert_points_batch(
                 point_id_options: Some(PointIdOptions::Num(idx)),
             };
 
+            // push dense & sparse vectors
+            let vectors_map: HashMap<String, Vector> = vec![
+                (
+                    DENSE_VECTOR_NAME.to_string(),
+                    random_dense_vector(vec_dim).into(),
+                ),
+                (
+                    SPARSE_VECTOR_NAME.to_string(),
+                    random_sparse_vector(vec_dim, 0.1).into(),
+                ),
+            ]
+            .into_iter()
+            .collect();
+
+            let vectors: Vectors = vectors_map.into();
+
             points.push(PointStruct::new(
                 point_id,
-                random_dense_vector(vec_dim),
+                vectors,
                 random_payload(Some(payload_count)),
             ));
         }

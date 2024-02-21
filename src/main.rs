@@ -28,7 +28,7 @@ async fn main() {
 
     ctrlc::set_handler(move || {
         log::info!("Crasher is stopping");
-        r.store(true, Ordering::SeqCst);
+        r.store(true, Ordering::Relaxed);
     })
     .expect("Error setting Ctrl-C handler");
 
@@ -52,7 +52,7 @@ async fn main() {
                         exit(1)
                     }
                     log::info!(
-                        "Qdrant is ready! Crashing it with probability {}",
+                        "Qdrant is ready! Crashing it with a probability of {}%",
                         crash_probability
                     );
 

@@ -47,7 +47,7 @@ impl Workload {
 impl Workload {
     pub async fn work(&self, client: &QdrantClient, args: Arc<Args>) {
         loop {
-            if self.stopped.clone().load(Ordering::SeqCst) {
+            if self.stopped.clone().load(Ordering::Relaxed) {
                 break;
             }
             let run = self.run(client, args.clone()).await;
@@ -60,14 +60,17 @@ impl Workload {
                     break;
                 }
                 Err(Invariant(msg)) => {
-                    log::error!("Workload run failed with violation: {}", msg);
+                    log::error!("Workload run failed with violation!\n{}", msg);
                     // send stop signal to the main thread
-                    self.stopped.store(true, Ordering::SeqCst);
+                    self.stopped.store(true, Ordering::Relaxed);
                     break;
                 }
                 Err(Client(error)) => {
                     // TODO disambiguate between server restarts and crashes
-                    log::error!("Workload run failed: {:?}", error);
+                    log::warn!(
+                        "Workload run failed due to client error - restarting soon\n{}",
+                        error
+                    );
                     // no need to hammer the server while it restarts
                     sleep(std::time::Duration::from_secs(3)).await;
                 }
