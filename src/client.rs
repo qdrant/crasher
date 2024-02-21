@@ -1,7 +1,7 @@
 use crate::args::Args;
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::Cancelled;
-use crate::generators::{random_filter, random_payload, random_vector};
+use crate::generators::{random_filter, random_payload, random_dense_vector};
 use anyhow::Context;
 use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
@@ -72,7 +72,7 @@ pub async fn get_points_count(
         .result
         .unwrap()
         .points_count;
-    Ok(point_count as usize)
+    Ok(point_count.unwrap_or(0) as usize)
 }
 
 /// Search points
@@ -82,7 +82,7 @@ pub async fn search_points(
     vec_dim: usize,
     payload_count: usize,
 ) -> Result<SearchResponse, anyhow::Error> {
-    let query_vector = random_vector(vec_dim);
+    let query_vector = random_dense_vector(vec_dim);
     let query_filter = random_filter(Some(payload_count));
 
     let response = client
@@ -98,6 +98,9 @@ pub async fn search_points(
             vector_name: None,
             with_vectors: None,
             read_consistency: None,
+            timeout: None,
+            shard_key_selector: None,
+            sparse_indices: None,
         })
         .await
         .context(format!("Failed to search points on {}", collection_name))?;
@@ -180,7 +183,7 @@ pub async fn insert_points_batch(
 
             points.push(PointStruct::new(
                 point_id,
-                random_vector(vec_dim),
+                random_dense_vector(vec_dim),
                 random_payload(Some(payload_count)),
             ));
         }
@@ -190,7 +193,7 @@ pub async fn insert_points_batch(
 
         // push batch blocking
         client
-            .upsert_points_blocking(collection_name, points, write_ordering.clone())
+            .upsert_points_blocking(collection_name, None, points, write_ordering.clone())
             .await
             .context(format!(
                 "Failed to insert {} points (batch {}/{}) into {}",
@@ -243,7 +246,13 @@ pub async fn set_payload(
     };
 
     let resp = client
-        .set_payload_blocking(collection_name, points_selector, payload, write_ordering)
+        .set_payload_blocking(
+            collection_name,
+            None,
+            points_selector,
+            payload,
+            write_ordering,
+        )
         .await
         .context(format!(
             "Failed to set payload for {} with payload_count {}",

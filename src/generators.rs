@@ -54,7 +54,7 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
     }
 }
 
-pub fn random_vector(dim: usize) -> Vec<f32> {
+pub fn random_dense_vector(dim: usize) -> Vec<f32> {
     let mut rng = rand::thread_rng();
     (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect()
 }
