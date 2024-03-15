@@ -30,6 +30,7 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
         should: vec![],
         must: vec![],
         must_not: vec![],
+        min_should: None,
     };
     let mut have_any = false;
     if let Some(keyword_variants) = keywords {
@@ -45,6 +46,7 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
                 geo_radius: None,
                 values_count: None,
                 geo_polygon: None,
+                datetime_range: None,
             }
             .into(),
         )

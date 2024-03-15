@@ -300,6 +300,7 @@ pub async fn set_payload(
             None,
             points_selector,
             payload,
+            None,
             write_ordering,
         )
         .await
