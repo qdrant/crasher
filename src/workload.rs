@@ -95,7 +95,7 @@ impl Workload {
             log::info!("Collection info: {:?}", collection_info);
         }
 
-        log::info!("Insert points");
+        log::info!("Run: insert points");
         insert_points_batch(
             client,
             &self.collection_name,
@@ -107,7 +107,7 @@ impl Workload {
         )
         .await?;
 
-        log::info!("Run set_payload");
+        log::info!("Run: set payload");
         for point_id in 1..self.points_count {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
@@ -122,7 +122,7 @@ impl Workload {
             .await?;
         }
 
-        log::info!("Run post-search");
+        log::info!("Run: search random vector");
         for _i in 0..self.search_count {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
@@ -136,7 +136,7 @@ impl Workload {
             .await?;
         }
 
-        log::info!("Run post_count");
+        log::info!("Run: point count");
         let points_count = get_points_count(client, &self.collection_name).await?;
         if points_count != self.points_count {
             return Err(Invariant(format!(
