@@ -10,7 +10,7 @@ anyhow = "1"
 thiserror = "1"
 rand = "0.8.5"
 clap = { version = "4.5.3", features = ["derive"] }
-tokio = {version = "1.36.0", features = ["full"]}
+tokio = { version = "1.37.0", features = ["full"] }
 qdrant-client = "1.8.0"
 ctrlc = "3.4.4"
 log = "0.4.21"
