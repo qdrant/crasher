@@ -126,7 +126,7 @@ pub async fn create_collection(
             SparseVectorParams {
                 index: Some(SparseIndexConfig {
                     full_scan_threshold: None,
-                    on_disk: Some(true),
+                    on_disk: Some(true), // make configurable
                 }),
             },
         )]
@@ -162,6 +162,7 @@ pub async fn create_collection(
                     payload_m: None,
                 }),
                 on_disk: Some(args.vectors_on_disk),
+                datatype: None,
             },
         )]
         .into_iter()
@@ -184,6 +185,7 @@ pub async fn create_collection(
                 memmap_threshold: args.memmap_threshold.map(|i| i as u64),
                 ..Default::default()
             }),
+            on_disk_payload: Some(true), // make configurable
             ..Default::default()
         })
         .await

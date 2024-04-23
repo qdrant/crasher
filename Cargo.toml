@@ -6,12 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1"
-thiserror = "1"
+anyhow = "1.0.82"
+thiserror = "1.0.59"
 rand = "0.8.5"
-clap = { version = "4.5.3", features = ["derive"] }
+clap = { version = "4.5.4", features = ["derive"] }
 tokio = { version = "1.37.0", features = ["full"] }
-qdrant-client = "1.8.0"
+qdrant-client = "1.9.0"
 ctrlc = "3.4.4"
 log = "0.4.21"
 env_logger = "0.11.3"
