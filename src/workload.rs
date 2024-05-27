@@ -1,5 +1,6 @@
 use anyhow::Result;
 use qdrant_client::client::QdrantClient;
+use qdrant_client::qdrant::vectors::VectorsOptions;
 use qdrant_client::qdrant::{FieldType, WriteOrdering};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -30,7 +31,7 @@ impl Workload {
         let vec_dim = 128;
         let payload_count = 1;
         let search_count = 10;
-        let points_count = 12_000;
+        let points_count = 14_000;
         let write_ordering = None; // default
         Workload {
             collection_name,
@@ -95,6 +96,15 @@ impl Workload {
             log::info!("Collection info: {:?}", collection_info);
         }
 
+        let current_count = get_points_count(client, &self.collection_name).await?;
+        if current_count != 0 {
+            log::info!(
+                "Run: pre integrity check ({} existing points)",
+                current_count
+            );
+            self.consistency_check(client, current_count).await?;
+        }
+
         log::info!("Run: insert points");
         insert_points_batch(
             client,
@@ -136,17 +146,8 @@ impl Workload {
             .await?;
         }
 
-        log::info!("Run: retrieve all point");
-        // retrieve all points at once
-        let ids: Vec<_> = (1..self.points_count - 1).collect();
-        let response = retrieve_points(client, &self.collection_name, &ids).await?;
-        // assert not empty
-        if response.result.len() != ids.len() {
-            return Err(Invariant(format!(
-                "Retrieve did not return all result {}",
-                response.result.len()
-            )));
-        }
+        log::info!("Run: post consistency check");
+        self.consistency_check(client, self.points_count).await?;
 
         log::info!("Run: search random vector");
         for _i in 0..self.search_count {
@@ -163,6 +164,59 @@ impl Workload {
         }
 
         log::info!("Workload finished");
+        Ok(())
+    }
+
+    /// Consistency checker for id range
+    async fn consistency_check(
+        &self,
+        client: &QdrantClient,
+        points_count: usize,
+    ) -> Result<(), CrasherError> {
+        // fetch all existing points
+        let all_ids: Vec<_> = (1..points_count).collect();
+        // by batches to not overload the server
+        for ids in all_ids.chunks(100) {
+            let response = retrieve_points(client, &self.collection_name, ids).await?;
+            // assert all there empty
+            if response.result.len() != ids.len() {
+                return Err(Invariant(format!(
+                    "Retrieve did not return all result {}",
+                    response.result.len()
+                )));
+            } else {
+                for point in response.result.iter() {
+                    let point_id = point.id.as_ref().expect("Point id should be present");
+                    if let Some(vectors) = &point.vectors {
+                        for vector in vectors.vectors_options.iter() {
+                            match vector {
+                                VectorsOptions::Vector(anonymous) => {
+                                    return Err(Invariant(format!(
+                                        "Vector {:?} should be named: {:?}",
+                                        point_id, anonymous
+                                    )));
+                                }
+                                VectorsOptions::Vectors(named_vectors) => {
+                                    for vector in named_vectors.vectors.values() {
+                                        if vector.data.is_empty() {
+                                            return Err(Invariant(format!(
+                                                "Vector {:?} should not be empty",
+                                                point_id
+                                            )));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        return Err(Invariant(format!(
+                            "Vector {:?} should be present in the response",
+                            point_id
+                        )));
+                    }
+                }
+            }
+        }
         Ok(())
     }
 }

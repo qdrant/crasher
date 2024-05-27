@@ -385,7 +385,7 @@ pub async fn retrieve_points(
 ) -> Result<GetResponse, anyhow::Error> {
     // type inference issues forces to ascribe the types :shrug:
     let with_vectors: Option<WithVectorsSelector> = Some(true.into());
-    let with_payload: Option<WithPayloadSelector> = None;
+    let with_payload: Option<WithPayloadSelector> = Some(true.into());
     let response = client
         .get_points(
             collection_name,

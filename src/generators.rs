@@ -77,5 +77,9 @@ pub fn random_sparse_vector(max_size: usize, sparsity: f64) -> Vec<(u32, f32)> {
         // Only positive values are generated to make sure to hit the pruning path.
         pairs.push((i as u32, rng.gen_range(0.0..10.0) as f32));
     }
+    if pairs.is_empty() {
+        // make sure at least one dimension is present
+        pairs.push((1, rng.gen_range(0.0..10.0) as f32));
+    }
     pairs
 }
