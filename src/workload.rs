@@ -8,7 +8,7 @@ use tokio::time::sleep;
 use crate::args::Args;
 use crate::client::{
     create_collection, create_field_index, get_collection_info, get_points_count,
-    insert_points_batch, search_points, set_payload,
+    insert_points_batch, retrieve_points, search_points, set_payload,
 };
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
@@ -27,10 +27,10 @@ pub struct Workload {
 impl Workload {
     pub fn new(stopped: Arc<AtomicBool>) -> Self {
         let collection_name = "workload-crasher".to_string();
-        let vec_dim = 1024;
-        let payload_count = 2;
-        let search_count = 100;
-        let points_count = 20_000;
+        let vec_dim = 128;
+        let payload_count = 1;
+        let search_count = 10;
+        let points_count = 12_000;
         let write_ordering = None; // default
         Workload {
             collection_name,
@@ -102,15 +102,29 @@ impl Workload {
             self.points_count,
             self.vec_dim,
             0, // no payload at first
+            args.only_sparse,
             None,
             self.stopped.clone(),
         )
         .await?;
 
+        log::info!("Run: point count");
+        let points_count = get_points_count(client, &self.collection_name).await?;
+        if points_count != self.points_count {
+            return Err(Invariant(format!(
+                "Collection has wrong number of points after insert {} vs {}",
+                points_count, self.points_count
+            )));
+        }
+
         log::info!("Run: set payload");
         for point_id in 1..self.points_count {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
+            }
+            if point_id % 2 == 0 {
+                // skip half of the points
+                continue;
             }
             set_payload(
                 client,
@@ -120,6 +134,18 @@ impl Workload {
                 self.write_ordering.clone(),
             )
             .await?;
+        }
+
+        log::info!("Run: retrieve all point");
+        // retrieve all points at once
+        let ids: Vec<_> = (1..self.points_count - 1).collect();
+        let response = retrieve_points(client, &self.collection_name, &ids).await?;
+        // assert not empty
+        if response.result.len() != ids.len() {
+            return Err(Invariant(format!(
+                "Retrieve did not return all result {}",
+                response.result.len()
+            )));
         }
 
         log::info!("Run: search random vector");
@@ -134,15 +160,6 @@ impl Workload {
                 self.payload_count,
             )
             .await?;
-        }
-
-        log::info!("Run: point count");
-        let points_count = get_points_count(client, &self.collection_name).await?;
-        if points_count != self.points_count {
-            return Err(Invariant(format!(
-                "Collection has wrong number of points after insert {} vs {}",
-                points_count, self.points_count
-            )));
         }
 
         log::info!("Workload finished");

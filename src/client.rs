@@ -12,11 +12,13 @@ use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
 use qdrant_client::qdrant::{
-    CollectionInfo, CreateCollection, Distance, FieldType, HnswConfigDiff, OptimizersConfigDiff,
-    PointId, PointStruct, PointsIdsList, PointsSelector, QuantizationConfig, ScalarQuantization,
-    SearchPoints, SearchResponse, SparseIndexConfig, SparseVectorConfig, SparseVectorParams,
-    Vector, VectorParams, VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
+    CollectionInfo, CountPoints, CreateCollection, Distance, FieldType, GetResponse,
+    HnswConfigDiff, OptimizersConfigDiff, PointId, PointStruct, PointsIdsList, PointsSelector,
+    QuantizationConfig, ScalarQuantization, SearchPoints, SearchResponse, SparseIndexConfig,
+    SparseVectorConfig, SparseVectorParams, Vector, VectorParams, VectorParamsMap, Vectors,
+    VectorsConfig, WithPayloadSelector, WithVectorsSelector, WriteOrdering,
 };
+use rand::Rng;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -62,8 +64,9 @@ pub async fn get_collection_info(
     Ok(collection_info)
 }
 
-/// Get points count
-pub async fn get_points_count(
+/// Get points count from collection info
+#[allow(dead_code)]
+pub async fn get_info_points_count(
     client: &QdrantClient,
     collection_name: &str,
 ) -> Result<usize, anyhow::Error> {
@@ -80,6 +83,31 @@ pub async fn get_points_count(
     Ok(point_count.unwrap_or(0) as usize)
 }
 
+/// Get points count
+pub async fn get_points_count(
+    client: &QdrantClient,
+    collection_name: &str,
+) -> Result<usize, anyhow::Error> {
+    let count_req = CountPoints {
+        collection_name: collection_name.to_string(),
+        filter: None,
+        exact: Some(true),
+        read_consistency: None,
+        shard_key_selector: None,
+    };
+    let point_count = client
+        .count(&count_req)
+        .await
+        .context(format!(
+            "Failed to run points count for {}",
+            collection_name
+        ))?
+        .result
+        .unwrap()
+        .count;
+    Ok(point_count as usize)
+}
+
 /// Search points
 pub async fn search_points(
     client: &QdrantClient,
@@ -87,6 +115,8 @@ pub async fn search_points(
     vec_dim: usize,
     payload_count: usize,
 ) -> Result<SearchResponse, anyhow::Error> {
+    // TODO generate sparse search as well
+
     let query_vector = random_dense_vector(vec_dim);
     let query_filter = random_filter(Some(payload_count));
 
@@ -194,41 +224,66 @@ pub async fn create_collection(
 }
 
 /// insert points into collection (blocking)
+#[allow(clippy::too_many_arguments)]
 pub async fn insert_points_batch(
     client: &QdrantClient,
     collection_name: &str,
     points_count: usize,
     vec_dim: usize,
     payload_count: usize,
+    only_sparse_vectors: bool,
     write_ordering: Option<WriteOrdering>,
     stopped: Arc<AtomicBool>,
 ) -> Result<(), CrasherError> {
-    let batch_size = 100;
-    let num_batches = points_count / batch_size;
-
+    let max_batch_size = 64;
+    // handle less than batch & spill over
+    let (batch_size, num_batches, last_batch_size) = if points_count <= max_batch_size {
+        (points_count, 1, points_count)
+    } else {
+        let remainder = points_count % max_batch_size;
+        let div = points_count / max_batch_size;
+        let num_batches = div + if remainder > 0 { 1 } else { 0 };
+        let last_batch_size = if remainder > 0 {
+            remainder
+        } else {
+            max_batch_size
+        };
+        (max_batch_size, num_batches, last_batch_size)
+    };
     for batch_id in 0..num_batches {
+        let batch_size = if batch_id == num_batches - 1 {
+            last_batch_size
+        } else {
+            batch_size
+        };
         let mut points = Vec::with_capacity(batch_size);
-        let batch_base_id = batch_id as u64 * batch_size as u64;
+        let batch_base_id = batch_id as u64 * max_batch_size as u64;
         for i in 0..batch_size {
             let idx = batch_base_id + i as u64;
-
             let point_id = PointId {
                 point_id_options: Some(PointIdOptions::Num(idx)),
             };
-
-            // push dense & sparse vectors
-            let vectors_map: HashMap<String, Vector> = vec![
-                (
+            let mut vectors_map: HashMap<String, Vector> = HashMap::new();
+            let mut rng = rand::thread_rng();
+            let add_dense = if only_sparse_vectors {
+                false
+            } else {
+                rng.gen_bool(0.5)
+            };
+            if add_dense {
+                vectors_map.insert(
                     DENSE_VECTOR_NAME.to_string(),
                     random_dense_vector(vec_dim).into(),
-                ),
-                (
+                );
+            }
+
+            let add_sparse = rng.gen_bool(0.5);
+            if add_sparse {
+                vectors_map.insert(
                     SPARSE_VECTOR_NAME.to_string(),
                     random_sparse_vector(vec_dim, 0.1).into(),
-                ),
-            ]
-            .into_iter()
-            .collect();
+                );
+            }
 
             let vectors: Vectors = vectors_map.into();
 
@@ -310,6 +365,7 @@ pub async fn set_payload(
             "Failed to set payload for {} with payload_count {}",
             point_id, payload_count
         ))?;
+
     if resp.result.unwrap().status != 2 {
         Err(anyhow::anyhow!(
             "Failed to set payload on point_id {} for {}",
@@ -319,4 +375,31 @@ pub async fn set_payload(
     } else {
         Ok(())
     }
+}
+
+/// Retrieve points
+pub async fn retrieve_points(
+    client: &QdrantClient,
+    collection_name: &str,
+    ids: &[usize],
+) -> Result<GetResponse, anyhow::Error> {
+    // type inference issues forces to ascribe the types :shrug:
+    let with_vectors: Option<WithVectorsSelector> = Some(true.into());
+    let with_payload: Option<WithPayloadSelector> = None;
+    let response = client
+        .get_points(
+            collection_name,
+            None,
+            ids.iter()
+                .map(|id| (*id as u64).into())
+                .collect::<Vec<_>>()
+                .as_slice(),
+            with_vectors,
+            with_payload,
+            None,
+        )
+        .await
+        .context(format!("Failed to retrieve points on {}", collection_name))?;
+
+    Ok(response)
 }
