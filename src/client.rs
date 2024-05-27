@@ -277,7 +277,11 @@ pub async fn insert_points_batch(
                 );
             }
 
-            let add_sparse = rng.gen_bool(0.5);
+            let add_sparse = if only_sparse_vectors {
+                true
+            } else {
+                rng.gen_bool(0.5)
+            };
             if add_sparse {
                 vectors_map.insert(
                     SPARSE_VECTOR_NAME.to_string(),

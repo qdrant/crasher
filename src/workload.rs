@@ -31,7 +31,7 @@ impl Workload {
         let vec_dim = 128;
         let payload_count = 1;
         let search_count = 10;
-        let points_count = 14_000;
+        let points_count = 20_000;
         let write_ordering = None; // default
         Workload {
             collection_name,
@@ -197,11 +197,17 @@ impl Workload {
                                     )));
                                 }
                                 VectorsOptions::Vectors(named_vectors) => {
-                                    for vector in named_vectors.vectors.values() {
+                                    if named_vectors.vectors.is_empty() {
+                                        return Err(Invariant(format!(
+                                            "Named vector {:?} should not be empty",
+                                            point_id
+                                        )));
+                                    }
+                                    for (name, vector) in &named_vectors.vectors {
                                         if vector.data.is_empty() {
                                             return Err(Invariant(format!(
-                                                "Vector {:?} should not be empty",
-                                                point_id
+                                                "Vector {} with id {:?} should not be empty",
+                                                name, point_id
                                             )));
                                         }
                                     }
