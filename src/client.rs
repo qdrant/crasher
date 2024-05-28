@@ -39,7 +39,13 @@ pub async fn wait_server_ready(
         match healthcheck {
             Ok(_) => break,
             Err(e) => {
-                log::debug!("Healthcheck failed: {}", e)
+                if start.elapsed().as_secs_f64() > 60.0 {
+                    return Err(CrasherError::Invariant(
+                        "Server did not start in time".to_string(),
+                    ));
+                } else {
+                    log::debug!("Healthcheck failed: {}", e)
+                }
             }
         }
     }
