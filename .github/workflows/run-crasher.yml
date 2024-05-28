@@ -32,10 +32,6 @@ jobs:
       # checkout crasher
       - name: Checkout Crasher
         uses: actions/checkout@v4
-      - name: Cache deps
-        uses: Swatinem/rust-cache@v2
-      - name: Build Crasher
-        run: cargo build
       # checkout qdrant dev
       - name: Checkout Qdrant
         uses: actions/checkout@v4
@@ -43,6 +39,15 @@ jobs:
           repository: qdrant/qdrant
           ref: dev
           path: ./qdrant
+      - name: Cache deps
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            /home/runner/work/crasher/crasher
+            /home/runner/work/crasher/crasher/qdrant
+      #          cache-directories: "/home/runner/work/crasher/crasher/qdrant"
+      - name: Build Crasher
+        run: cargo build
       - name: Build Qdrant
         working-directory: /home/runner/work/crasher/crasher/qdrant
         run: cargo build
@@ -56,9 +61,9 @@ jobs:
           fi
           ./qdrant/target/debug/qdrant --version
           ./crash-things.sh "/home/runner/work/crasher/crasher/qdrant/" "target/debug/qdrant" "0.3" "$crashing_time"
-          cat crasher_output.log
       - name: Upload logs in case of failure
         uses: actions/upload-artifact@v4
+        if: failure() || cancelled()
         with:
           name: crasher-logs
           retention-days: 2 # default max value
