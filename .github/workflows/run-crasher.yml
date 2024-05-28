@@ -1,0 +1,65 @@
+name: Crash
+
+on:
+  push:
+#    branches: [ "master" ]
+    branches: [ "ci/add-workflow" ]
+#  pull_request:
+#    branches: [ "master" ]
+  workflow_dispatch:
+    branches: [ "ci/add-workflow" ]
+    inputs:
+      qdrant_version:
+        description: "Version of qdrant to checkout (tags/v1.6.1, <commit-id>, my-branch)"
+        default: dev
+      crashing_time:
+        description: "Duration in seconds"
+        default: 300
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install minimal stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      # checkout crasher
+      - name: Checkout Crasher
+        uses: actions/checkout@v4
+      - name: Cache deps
+        uses: Swatinem/rust-cache@v2
+      - name: Build Crasher
+        run: cargo build
+      # checkout qdrant dev
+      - name: Checkout Qdrant
+        uses: actions/checkout@v4
+        with:
+          repository: qdrant/qdrant
+          ref: dev
+          path: ./qdrant
+      - name: Build Qdrant
+        working-directory: /home/runner/work/crasher/crasher/qdrant
+        run: cargo build
+      - name: Crash things
+        working-directory: /home/runner/work/crasher/crasher
+        shell: bash
+        run: |
+          crashing_time="${{ inputs.crashing_time }}"
+          if [ -z "$crashing_time" ]; then
+            crashing_time="300"
+          fi
+          ./qdrant/target/debug/qdrant --version
+          ./crash-things.sh "/home/runner/work/crasher/crasher/qdrant/" "target/debug/qdrant" "0.3" "$crashing_time"
+          cat crasher_output.log
+      - name: Upload logs in case of failure
+        uses: actions/upload-artifact@v4
+        with:
+          name: crasher-logs
+          retention-days: 2 # default max value
+          path: crasher_output.log
