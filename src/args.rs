@@ -13,6 +13,9 @@ pub struct Args {
     /// Probability to kill running instance
     #[arg(long, default_value_t = 0.1)]
     pub crash_probability: f64,
+    /// The time in second to sleep between crashes attempt
+    #[arg(long, default_value_t = 5)]
+    pub sleep_duration_between_crash_sec: usize,
     /// Qdrant gRPC service URIs (can be used several times to specify several URIs)
     #[arg(long, default_value = "http://localhost:6334")]
     pub uris: Vec<String>,

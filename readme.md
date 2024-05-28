@@ -21,6 +21,8 @@ Options:
           Path to executable binary relative to `working_dir`
       --crash-probability <CRASH_PROBABILITY>
           Probability to kill running instance [default: 0.1]
+      --sleep-duration-between-crash-sec <SLEEP_DURATION_BETWEEN_CRASH_SEC>
+          The time in second to sleep between crashes attempt [default: 1]
       --uris <URIS>
           Qdrant gRPC service URIs (can be used several times to specify several URIs) [default: http://localhost:6334]
       --replication-factor <REPLICATION_FACTOR>
@@ -37,6 +39,8 @@ Options:
           If true - serve vectors from disk. If set to false, the vectors will be loaded in RAM
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
           Timeout of gRPC client [default: 2000]
+      --only-sparse
+          Whether to only upsert sparse vectors
   -h, --help
           Print help
   -V, --version
@@ -45,9 +49,13 @@ Options:
 
 Examples:
 
+- using debug binary:
+
 ```bash
-cargo run -- --working-dir "/home/agourlay/Workspace/qdrant/" --exec-path "target/debug/qdrant"
+cargo run -r -- --working-dir "/home/agourlay/Workspace/qdrant/" --exec-path "target/debug/qdrant"
 ```
+
+- using release binary:
 
 ```bash
 cargo run -r -- --working-dir "/home/agourlay/Workspace/qdrant/" --exec-path "target/release/qdrant" --indexing-threshold 2000 --memmap-threshold 2000

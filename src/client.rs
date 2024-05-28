@@ -18,7 +18,6 @@ use qdrant_client::qdrant::{
     SparseVectorConfig, SparseVectorParams, Vector, VectorParams, VectorParamsMap, Vectors,
     VectorsConfig, WithPayloadSelector, WithVectorsSelector, WriteOrdering,
 };
-use rand::Rng;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -206,17 +205,28 @@ pub async fn create_collection(
     client
         .create_collection(&CreateCollection {
             collection_name: collection_name.to_string(),
+            hnsw_config: None,
             vectors_config: dense_vectors_config,
             sparse_vectors_config,
             replication_factor: Some(args.replication_factor as u32),
             write_consistency_factor: Some(args.write_consistency_factor as u32),
+            init_from_collection: None,
+            quantization_config: None,
             optimizers_config: Some(OptimizersConfigDiff {
+                deleted_threshold: None,
+                vacuum_min_vector_number: None,
+                default_segment_number: Some(2), // to force constant merges
                 indexing_threshold: args.indexing_threshold.map(|i| i as u64),
+                flush_interval_sec: Some(120), // large value to keep things interesting
                 memmap_threshold: args.memmap_threshold.map(|i| i as u64),
-                ..Default::default()
+                max_segment_size: None,
+                max_optimization_threads: None,
             }),
+            shard_number: None,
             on_disk_payload: Some(true), // make configurable
-            ..Default::default()
+            wal_config: None,
+            timeout: None,
+            sharding_method: None,
         })
         .await
         .context(format!("Failed to create collection {}", collection_name))?;
@@ -251,10 +261,10 @@ pub async fn insert_points_batch(
         (max_batch_size, num_batches, last_batch_size)
     };
     for batch_id in 0..num_batches {
-        let batch_size = if batch_id == num_batches - 1 {
-            last_batch_size
+        let (wait, batch_size) = if batch_id == num_batches - 1 {
+            (true, last_batch_size)
         } else {
-            batch_size
+            (false, batch_size)
         };
         let mut points = Vec::with_capacity(batch_size);
         let batch_base_id = batch_id as u64 * max_batch_size as u64;
@@ -264,30 +274,19 @@ pub async fn insert_points_batch(
                 point_id_options: Some(PointIdOptions::Num(idx)),
             };
             let mut vectors_map: HashMap<String, Vector> = HashMap::new();
-            let mut rng = rand::thread_rng();
-            let add_dense = if only_sparse_vectors {
-                false
-            } else {
-                rng.gen_bool(0.5)
-            };
-            if add_dense {
+
+            if !only_sparse_vectors {
                 vectors_map.insert(
                     DENSE_VECTOR_NAME.to_string(),
                     random_dense_vector(vec_dim).into(),
                 );
             }
 
-            let add_sparse = if only_sparse_vectors {
-                true
-            } else {
-                rng.gen_bool(0.5)
-            };
-            if add_sparse {
-                vectors_map.insert(
-                    SPARSE_VECTOR_NAME.to_string(),
-                    random_sparse_vector(vec_dim, 0.1).into(),
-                );
-            }
+            // always add sparse vector
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
+            );
 
             let vectors: Vectors = vectors_map.into();
 
@@ -301,14 +300,25 @@ pub async fn insert_points_batch(
             return Err(Cancelled);
         }
 
-        // push batch blocking
-        client
-            .upsert_points_blocking(collection_name, None, points, write_ordering.clone())
-            .await
-            .context(format!(
-                "Failed to insert {} points (batch {}/{}) into {}",
-                batch_size, batch_id, num_batches, collection_name
-            ))?;
+        if wait {
+            // push batch blocking
+            client
+                .upsert_points_blocking(collection_name, None, points, write_ordering.clone())
+                .await
+                .context(format!(
+                    "Failed to block insert {} points (batch {}/{}) into {}",
+                    batch_size, batch_id, num_batches, collection_name
+                ))?;
+        } else {
+            // push batch non-blocking
+            client
+                .upsert_points(collection_name, None, points, write_ordering.clone())
+                .await
+                .context(format!(
+                    "Failed to insert {} points (batch {}/{}) into {}",
+                    batch_size, batch_id, num_batches, collection_name
+                ))?;
+        }
     }
     Ok(())
 }

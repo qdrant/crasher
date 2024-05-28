@@ -42,6 +42,7 @@ impl ProcessManager {
         stopped: Arc<AtomicBool>,
         client: &QdrantClient,
         crash_probability: f64,
+        sleep_duration_between_crash_sec: usize,
     ) {
         loop {
             if stopped.load(Ordering::Relaxed) {
@@ -62,7 +63,7 @@ impl ProcessManager {
                 log::info!("Qdrant is ready!");
             }
             // wait a bit before next chaos
-            sleep(Duration::from_secs(5)).await;
+            sleep(Duration::from_secs(sleep_duration_between_crash_sec as u64)).await;
         }
     }
 }

@@ -37,6 +37,7 @@ async fn main() {
     let client = Arc::new(client).clone();
     let args = Arc::new(args);
     let crash_probability = args.crash_probability;
+    let sleep_duration_between_crash_sec = args.sleep_duration_between_crash_sec;
 
     match ProcessManager::new(&args.working_dir, &args.exec_path) {
         Err(e) => {
@@ -69,7 +70,12 @@ async fn main() {
                     // process manager task
                     let process_manager_task = tokio::spawn(async move {
                         process_manager
-                            .chaos(stopped.clone(), &client.clone(), crash_probability)
+                            .chaos(
+                                stopped.clone(),
+                                &client.clone(),
+                                crash_probability,
+                                sleep_duration_between_crash_sec,
+                            )
                             .await;
                     });
 
