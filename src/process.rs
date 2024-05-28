@@ -1,6 +1,7 @@
 use crate::client::wait_server_ready;
 use qdrant_client::client::QdrantClient;
 use rand::Rng;
+use std::process::exit;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -59,6 +60,7 @@ impl ProcessManager {
                 self.child_process = start_process(&self.working_dir, &self.binary_path).unwrap();
                 if let Err(e) = wait_server_ready(client, stopped.clone()).await {
                     log::error!("Failed to wait for qdrant to be ready: {}", e);
+                    exit(1);
                 }
                 log::info!("Qdrant is ready!");
             }
