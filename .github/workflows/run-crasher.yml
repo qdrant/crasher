@@ -2,10 +2,9 @@ name: Crash
 
 on:
   push:
-#    branches: [ "master" ]
-    branches: [ "ci/add-workflow" ]
-#  pull_request:
-#    branches: [ "master" ]
+    branches: [ "ci/add-workflow", "master" ]
+  pull_request:
+    branches: [ "master" ]
   workflow_dispatch:
     branches: [ "ci/add-workflow" ]
     inputs:
@@ -13,8 +12,8 @@ on:
         description: "Version of qdrant to checkout (tags/v1.6.1, <commit-id>, my-branch)"
         default: dev
       crashing_time:
-        description: "Duration in seconds"
-        default: 300
+        description: "Duration in seconds, default is 1200s (20 min) "
+        default: 1200
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,12 +31,27 @@ jobs:
       # checkout crasher
       - name: Checkout Crasher
         uses: actions/checkout@v4
+      - name: Process inputs
+        id: default_inputs
+        run: |
+          qdrant_version="${{ inputs.qdrant_version }}"
+          if [ -z "$qdrant_version" ]; then
+            qdrant_version="dev"
+          fi
+          
+          crashing_time="${{ inputs.crashing_time }}"
+          if [ -z "$crashing_time" ]; then
+            crashing_time="1200"
+          fi          
+          
+          echo "qdrant_version=${qdrant_version}" >> $GITHUB_OUTPUT
+          echo "crashing_time=${crashing_time}" >> $GITHUB_OUTPUT
       # checkout qdrant dev
       - name: Checkout Qdrant
         uses: actions/checkout@v4
         with:
           repository: qdrant/qdrant
-          ref: dev
+          ref: ${{ steps.default_inputs.outputs.qdrant_version }}
           path: ./qdrant
       - name: Cache deps
         uses: Swatinem/rust-cache@v2
@@ -45,7 +59,6 @@ jobs:
           workspaces: |
             /home/runner/work/crasher/crasher
             /home/runner/work/crasher/crasher/qdrant
-      #          cache-directories: "/home/runner/work/crasher/crasher/qdrant"
       - name: Build Crasher
         run: cargo build
       - name: Build Qdrant
@@ -55,10 +68,8 @@ jobs:
         working-directory: /home/runner/work/crasher/crasher
         shell: bash
         run: |
-          crashing_time="${{ inputs.crashing_time }}"
-          if [ -z "$crashing_time" ]; then
-            crashing_time="300"
-          fi
+          crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
+          echo "$crashing_time"
           ./qdrant/target/debug/qdrant --version
           ./crash-things.sh "/home/runner/work/crasher/crasher/qdrant/" "target/debug/qdrant" "0.3" "$crashing_time"
       - name: Upload logs in case of failure
@@ -66,5 +77,5 @@ jobs:
         if: failure() || cancelled()
         with:
           name: crasher-logs
-          retention-days: 2 # default max value
+          retention-days: 90 # default max value
           path: crasher_output.log
