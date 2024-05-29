@@ -66,13 +66,21 @@ impl Workload {
                     break;
                 }
                 Err(Client(error)) => {
-                    // TODO disambiguate between server restarts and crashes
-                    log::warn!(
-                        "Workload run failed due to client error - restarting soon\n{}",
-                        error
-                    );
-                    // no need to hammer the server while it restarts
-                    sleep(std::time::Duration::from_secs(3)).await;
+                    // turn client error into hard error if it is a server error (a bit hacky)
+                    let debug_error = format!("{:?}", error);
+                    if debug_error.contains("Service internal error") {
+                        log::error!("Workload run failed due to a server error!\n{}", error);
+                        // send stop signal to the main thread
+                        self.stopped.store(true, Ordering::Relaxed);
+                        break;
+                    } else {
+                        log::warn!(
+                            "Workload run failed due to client error - resuming soon\n{}",
+                            error
+                        );
+                        // no need to hammer the server while it restarts
+                        sleep(std::time::Duration::from_secs(3)).await;
+                    }
                 }
             }
         }
@@ -165,8 +173,6 @@ impl Workload {
             .await?;
         }
 
-        // TODO delete points in reverse order
-
         log::info!("Workload finished");
         Ok(())
     }
@@ -181,20 +187,7 @@ impl Workload {
         let all_ids: Vec<_> = (1..points_count).collect();
         // by batches to not overload the server
         for ids in all_ids.chunks(100) {
-            let response = retrieve_points(client, &self.collection_name, ids)
-                .await
-                .map_err(|err| {
-                    // TODO can we do better here??
-                    let debug_error = format!("{:?}", err);
-                    if debug_error.contains("Service internal error") {
-                        Invariant(format!(
-                            "Retrieve is not working properly, got error: {:?}",
-                            err
-                        ))
-                    } else {
-                        Client(err)
-                    }
-                })?;
+            let response = retrieve_points(client, &self.collection_name, ids).await?;
             // assert all there empty
             if response.result.len() != ids.len() {
                 return Err(Invariant(format!(
