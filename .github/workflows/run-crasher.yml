@@ -12,8 +12,8 @@ on:
         description: "Version of qdrant to checkout (tags/v1.6.1, <commit-id>, my-branch)"
         default: dev
       crashing_time:
-        description: "Duration in seconds, default is 1200s (20 min) "
-        default: 1200
+        description: "Duration in seconds, default is 2400s (40 min) "
+        default: 2400
 
 env:
   CARGO_TERM_COLOR: always
