@@ -8,7 +8,7 @@ use tokio::time::sleep;
 
 use crate::args::Args;
 use crate::client::{
-    create_collection, create_field_index, get_collection_info, get_points_count,
+    create_collection, create_field_index, delete_points, get_collection_info, get_points_count,
     insert_points_batch, retrieve_points, search_points, set_payload,
 };
 use crate::crasher_error::CrasherError;
@@ -102,6 +102,9 @@ impl Workload {
                 current_count
             );
             self.consistency_check(client, current_count).await?;
+
+            log::info!("Run: delete existing points");
+            delete_points(client, &self.collection_name, current_count).await?;
         }
 
         log::info!("Run: insert points");
@@ -178,7 +181,20 @@ impl Workload {
         let all_ids: Vec<_> = (1..points_count).collect();
         // by batches to not overload the server
         for ids in all_ids.chunks(100) {
-            let response = retrieve_points(client, &self.collection_name, ids).await?;
+            let response = retrieve_points(client, &self.collection_name, ids)
+                .await
+                .map_err(|err| {
+                    // TODO can we do better here??
+                    let debug_error = format!("{:?}", err);
+                    if debug_error.contains("Service internal error") {
+                        Invariant(format!(
+                            "Retrieve is not working properly, got error: {:?}",
+                            err
+                        ))
+                    } else {
+                        Client(err)
+                    }
+                })?;
             // assert all there empty
             if response.result.len() != ids.len() {
                 return Err(Invariant(format!(

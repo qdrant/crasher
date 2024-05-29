@@ -482,3 +482,43 @@ pub async fn retrieve_points(
 
     Ok(response)
 }
+
+/// delete points (blocking)
+pub async fn delete_points(
+    client: &QdrantClient,
+    collection_name: &str,
+    points_count: usize,
+) -> Result<(), anyhow::Error> {
+    let points_selector = (0..points_count as u64)
+        .map(|id| PointId {
+            point_id_options: Some(PointIdOptions::Num(id)),
+        })
+        .collect();
+
+    // delete all points
+    let resp = client
+        .delete_points_blocking(
+            collection_name,
+            None,
+            &PointsSelector {
+                points_selector_one_of: Some(PointsSelectorOneOf::Points(PointsIdsList {
+                    ids: points_selector,
+                })),
+            },
+            None,
+        )
+        .await
+        .context(format!(
+            "Failed to delete {} points for {}",
+            points_count, collection_name
+        ))?;
+    if resp.result.unwrap().status != 2 {
+        Err(anyhow::anyhow!(
+            "Failed to delete {} points for {}",
+            points_count,
+            collection_name
+        ))
+    } else {
+        Ok(())
+    }
+}
