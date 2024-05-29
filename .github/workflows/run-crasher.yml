@@ -59,9 +59,9 @@ jobs:
           workspaces: |
             /home/runner/work/crasher/crasher
             /home/runner/work/crasher/crasher/qdrant
-      - name: Build Crasher
-        run: cargo build
-      - name: Build Qdrant
+      - name: Build Crasher (release)
+        run: cargo build -r
+      - name: Build Qdrant (debug)
         working-directory: /home/runner/work/crasher/crasher/qdrant
         run: cargo build
       - name: Crash things
