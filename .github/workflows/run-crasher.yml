@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [ "master" ]
   workflow_dispatch:
-    branches: [ "ci/add-workflow" ]
     inputs:
       qdrant_version:
         description: "Version of qdrant to checkout (tags/v1.6.1, <commit-id>, my-branch)"
@@ -22,15 +21,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Install minimal stable
-        uses: dtolnay/rust-toolchain@stable
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      # checkout crasher
-      - name: Checkout Crasher
-        uses: actions/checkout@v4
       - name: Process inputs
         id: default_inputs
         run: |
@@ -46,6 +36,15 @@ jobs:
           
           echo "qdrant_version=${qdrant_version}" >> $GITHUB_OUTPUT
           echo "crashing_time=${crashing_time}" >> $GITHUB_OUTPUT
+      - name: Install minimal stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      # checkout crasher
+      - name: Checkout Crasher
+        uses: actions/checkout@v4
       # checkout qdrant dev
       - name: Checkout Qdrant
         uses: actions/checkout@v4
@@ -69,8 +68,6 @@ jobs:
         shell: bash
         run: |
           crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
-          echo "$crashing_time"
-          ./qdrant/target/debug/qdrant --version
           ./crash-things.sh "/home/runner/work/crasher/crasher/qdrant/" "target/debug/qdrant" "0.3" "$crashing_time"
       - name: Upload logs in case of failure
         uses: actions/upload-artifact@v4
