@@ -1,0 +1,79 @@
+name: Crash
+
+on:
+  push:
+    branches: [ "ci/add-workflow", "master" ]
+  schedule:
+    # every day at 12 CET
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+    inputs:
+      qdrant_version:
+        description: "Version of qdrant to checkout (tags/v1.6.1, <commit-id>, my-branch)"
+        default: dev
+      crashing_time:
+        description: "Duration in seconds, default is 1200s (20 min) "
+        default: 1200
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Process inputs
+        id: default_inputs
+        run: |
+          qdrant_version="${{ inputs.qdrant_version }}"
+          if [ -z "$qdrant_version" ]; then
+            qdrant_version="dev"
+          fi
+          
+          crashing_time="${{ inputs.crashing_time }}"
+          if [ -z "$crashing_time" ]; then
+            crashing_time="1200"
+          fi          
+          
+          echo "qdrant_version=${qdrant_version}" >> $GITHUB_OUTPUT
+          echo "crashing_time=${crashing_time}" >> $GITHUB_OUTPUT
+      - name: Install minimal stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      # checkout crasher
+      - name: Checkout Crasher
+        uses: actions/checkout@v4
+      # checkout qdrant dev
+      - name: Checkout Qdrant
+        uses: actions/checkout@v4
+        with:
+          repository: qdrant/qdrant
+          ref: ${{ steps.default_inputs.outputs.qdrant_version }}
+          path: ./qdrant
+      - name: Cache deps
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            /home/runner/work/crasher/crasher
+            /home/runner/work/crasher/crasher/qdrant
+      - name: Build Crasher
+        run: cargo build
+      - name: Build Qdrant
+        working-directory: /home/runner/work/crasher/crasher/qdrant
+        run: cargo build
+      - name: Crash things
+        working-directory: /home/runner/work/crasher/crasher
+        shell: bash
+        run: |
+          crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
+          ./crash-things.sh "/home/runner/work/crasher/crasher/qdrant/" "target/debug/qdrant" "0.2" "$crashing_time"
+      - name: Upload logs in case of failure
+        uses: actions/upload-artifact@v4
+        if: failure() || cancelled()
+        with:
+          name: crasher-logs
+          retention-days: 90 # default max value
+          path: crasher_output.log
