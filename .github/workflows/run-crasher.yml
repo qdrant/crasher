@@ -32,7 +32,7 @@ jobs:
           
           crashing_time="${{ inputs.crashing_time }}"
           if [ -z "$crashing_time" ]; then
-            crashing_time="1200"
+            crashing_time="2400"
           fi          
           
           echo "qdrant_version=${qdrant_version}" >> $GITHUB_OUTPUT
