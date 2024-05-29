@@ -6,6 +6,9 @@ use qdrant_client::qdrant::{FieldCondition, Filter, Match};
 use rand::Rng;
 
 pub const DENSE_VECTOR_NAME: &str = "dense-vector";
+pub const DENSE_VECTOR_NAME_SQ: &str = "dense-vector-sq";
+pub const DENSE_VECTOR_NAME_PQ: &str = "dense-vector-pq";
+pub const DENSE_VECTOR_NAME_BQ: &str = "dense-vector-bq";
 pub const SPARSE_VECTOR_NAME: &str = "sparse-vector";
 pub const KEYWORD_PAYLOAD_KEY: &str = "a";
 

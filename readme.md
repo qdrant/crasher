@@ -22,9 +22,15 @@ Options:
       --crash-probability <CRASH_PROBABILITY>
           Probability to kill running instance [default: 0.1]
       --sleep-duration-between-crash-sec <SLEEP_DURATION_BETWEEN_CRASH_SEC>
-          The time in second to sleep between crashes attempt [default: 1]
+          The time in second to sleep between crashes attempt [default: 5]
       --uris <URIS>
           Qdrant gRPC service URIs (can be used several times to specify several URIs) [default: http://localhost:6334]
+      --points-count <POINTS_COUNT>
+          Number of points to generate [default: 12000]
+      --flush-interval-sec <FLUSH_INTERVAL_SEC>
+          Configure the flush interval for collections [default: 5]
+      --segment-count <SEGMENT_COUNT>
+          Configure the number of segment [default: 2]
       --replication-factor <REPLICATION_FACTOR>
           Replication factor for collections [default: 1]
       --write-consistency-factor <WRITE_CONSISTENCY_FACTOR>
@@ -33,10 +39,8 @@ Options:
           Optimizer indexing threshold
       --memmap-threshold <MEMMAP_THRESHOLD>
           Maximum size (in KiloBytes) of vectors to store in-memory per segment
-      --use-scalar-quantization
-          Whether to use scalar quantization for vectors
-      --vectors-on-disk
-          If true - serve vectors from disk. If set to false, the vectors will be loaded in RAM
+      --on-disk
+          If true - configure collection to read vectors, payload and indexes from disk. If set to false, the data will be loaded in RAM
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
           Timeout of gRPC client [default: 2000]
       --only-sparse

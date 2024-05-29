@@ -19,6 +19,15 @@ pub struct Args {
     /// Qdrant gRPC service URIs (can be used several times to specify several URIs)
     #[arg(long, default_value = "http://localhost:6334")]
     pub uris: Vec<String>,
+    /// Number of points to generate
+    #[arg(long, default_value_t = 12_000)]
+    pub points_count: usize,
+    /// Configure the flush interval for collections
+    #[arg(long, default_value_t = 5)]
+    pub flush_interval_sec: usize,
+    /// Configure the number of segment
+    #[arg(long, default_value_t = 2)]
+    pub segment_count: usize,
     /// Replication factor for collections
     #[arg(long, default_value_t = 1)]
     pub replication_factor: usize,
@@ -31,14 +40,11 @@ pub struct Args {
     /// Maximum size (in KiloBytes) of vectors to store in-memory per segment.
     #[arg(long)]
     pub memmap_threshold: Option<usize>,
-    /// Whether to use scalar quantization for vectors
+    /// If true - configure collection to read vectors, payload and indexes from disk. If set to false, the data will be loaded in RAM.
     #[arg(long, default_value_t = true)]
-    pub use_scalar_quantization: bool,
-    /// If true - serve vectors from disk. If set to false, the vectors will be loaded in RAM.
-    #[arg(long, default_value_t = true)]
-    pub vectors_on_disk: bool,
+    pub on_disk: bool,
     /// Timeout of gRPC client
-    #[arg(long, default_value_t = 2000)]
+    #[arg(long, default_value_t = 2_000)]
     pub grpc_timeout_ms: usize,
     /// Whether to only upsert sparse vectors
     #[arg(long, default_value_t = false)]

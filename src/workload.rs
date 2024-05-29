@@ -26,12 +26,11 @@ pub struct Workload {
 }
 
 impl Workload {
-    pub fn new(stopped: Arc<AtomicBool>) -> Self {
+    pub fn new(stopped: Arc<AtomicBool>, points_count: usize) -> Self {
         let collection_name = "workload-crasher".to_string();
         let vec_dim = 1024;
         let payload_count = 1;
         let search_count = 10;
-        let points_count = 50_000;
         let write_ordering = None; // default
         Workload {
             collection_name,
@@ -162,6 +161,8 @@ impl Workload {
             )
             .await?;
         }
+
+        // TODO delete points in reverse order
 
         log::info!("Workload finished");
         Ok(())
