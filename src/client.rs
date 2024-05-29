@@ -3,7 +3,8 @@ use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::Cancelled;
 use crate::generators::{
     random_dense_vector, random_filter, random_payload, random_sparse_vector, DENSE_VECTOR_NAME,
-    DENSE_VECTOR_NAME_BQ, DENSE_VECTOR_NAME_PQ, DENSE_VECTOR_NAME_SQ, SPARSE_VECTOR_NAME,
+    DENSE_VECTOR_NAME_BQ, DENSE_VECTOR_NAME_PQ, DENSE_VECTOR_NAME_SQ, DENSE_VECTOR_NAME_UINT8,
+    SPARSE_VECTOR_NAME, SPARSE_VECTOR_NAME_BIS,
 };
 use anyhow::Context;
 use qdrant_client::client::QdrantClient;
@@ -158,15 +159,26 @@ pub async fn create_collection(
 ) -> Result<(), anyhow::Error> {
     let on_disk = args.on_disk;
     let sparse_vectors_config = {
-        let params = vec![(
-            SPARSE_VECTOR_NAME.to_string(),
-            SparseVectorParams {
-                index: Some(SparseIndexConfig {
-                    full_scan_threshold: None,
-                    on_disk: Some(on_disk),
-                }),
-            },
-        )]
+        let params = vec![
+            (
+                SPARSE_VECTOR_NAME.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(on_disk),
+                    }),
+                },
+            ),
+            (
+                SPARSE_VECTOR_NAME_BIS.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(on_disk),
+                    }),
+                },
+            ),
+        ]
         .into_iter()
         .collect();
 
@@ -188,7 +200,7 @@ pub async fn create_collection(
                 DENSE_VECTOR_NAME.to_string(),
                 VectorParams {
                     size: vec_dim as u64,
-                    distance: Distance::Dot.into(), // make configurable
+                    distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config: hnsw_config.clone(),
                     on_disk: Some(on_disk),
@@ -196,15 +208,26 @@ pub async fn create_collection(
                 },
             ),
             (
+                DENSE_VECTOR_NAME_UINT8.to_string(),
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(on_disk),
+                    datatype: Some(2), // UInt8
+                },
+            ),
+            (
                 DENSE_VECTOR_NAME_SQ.to_string(),
                 VectorParams {
                     size: vec_dim as u64,
-                    distance: Distance::Dot.into(), // make configurable
+                    distance: Distance::Dot.into(),
                     quantization_config: Some(QuantizationConfig {
                         quantization: Some(Quantization::Scalar(ScalarQuantization {
-                            r#type: 1, //Int8
+                            r#type: 1, // Int8
                             quantile: None,
-                            always_ram: Some(true),
+                            always_ram: Some(!on_disk),
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
@@ -216,11 +239,11 @@ pub async fn create_collection(
                 DENSE_VECTOR_NAME_PQ.to_string(),
                 VectorParams {
                     size: vec_dim as u64,
-                    distance: Distance::Dot.into(), // make configurable
+                    distance: Distance::Dot.into(),
                     quantization_config: Some(QuantizationConfig {
                         quantization: Some(Quantization::Product(ProductQuantization {
-                            compression: 1,
-                            always_ram: Some(on_disk),
+                            compression: 1, // x8
+                            always_ram: Some(!on_disk),
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
@@ -232,10 +255,10 @@ pub async fn create_collection(
                 DENSE_VECTOR_NAME_BQ.to_string(),
                 VectorParams {
                     size: vec_dim as u64,
-                    distance: Distance::Dot.into(), // make configurable
+                    distance: Distance::Dot.into(),
                     quantization_config: Some(QuantizationConfig {
                         quantization: Some(Quantization::Binary(BinaryQuantization {
-                            always_ram: Some(on_disk),
+                            always_ram: Some(!on_disk),
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
@@ -334,6 +357,10 @@ pub async fn insert_points_batch(
                     random_dense_vector(vec_dim).into(),
                 );
                 vectors_map.insert(
+                    DENSE_VECTOR_NAME_UINT8.to_string(),
+                    random_dense_vector(vec_dim).into(),
+                );
+                vectors_map.insert(
                     DENSE_VECTOR_NAME_SQ.to_string(),
                     random_dense_vector(vec_dim).into(),
                 );
@@ -347,10 +374,15 @@ pub async fn insert_points_batch(
                 );
             }
 
-            // always add sparse vector
+            // always add sparse vectors
             vectors_map.insert(
                 SPARSE_VECTOR_NAME.to_string(),
                 random_sparse_vector(vec_dim, 0.1).into(),
+            );
+
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME_BIS.to_string(), // second regular one until we get more options
+                random_sparse_vector(vec_dim, 0.01).into(),
             );
 
             let vectors: Vectors = vectors_map.into();
