@@ -1,7 +1,9 @@
 use anyhow::Result;
 use qdrant_client::client::QdrantClient;
+use qdrant_client::prelude::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors::VectorsOptions;
 use qdrant_client::qdrant::{FieldType, WriteOrdering};
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::time::sleep;
@@ -111,6 +113,20 @@ impl Workload {
             );
             self.consistency_check(client, current_count).await?;
 
+            log::info!("Run: pre search random vector");
+            for _i in 0..self.search_count {
+                if self.stopped.load(Ordering::Relaxed) {
+                    return Err(Cancelled);
+                }
+                search_points(
+                    client,
+                    &self.collection_name,
+                    self.vec_dim,
+                    self.payload_count,
+                )
+                .await?;
+            }
+
             log::info!("Run: delete existing points");
             delete_points(client, &self.collection_name, current_count).await?;
         }
@@ -159,7 +175,7 @@ impl Workload {
         log::info!("Run: post consistency check");
         self.consistency_check(client, self.points_count).await?;
 
-        log::info!("Run: search random vector");
+        log::info!("Run: post search random vector");
         for _i in 0..self.search_count {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
@@ -183,16 +199,32 @@ impl Workload {
         client: &QdrantClient,
         points_count: usize,
     ) -> Result<(), CrasherError> {
-        // fetch all existing points
+        // fetch all existing points (rely on numeric ids!)
         let all_ids: Vec<_> = (1..points_count).collect();
         // by batches to not overload the server
         for ids in all_ids.chunks(100) {
             let response = retrieve_points(client, &self.collection_name, ids).await?;
             // assert all there empty
             if response.result.len() != ids.len() {
+                let response_ids = response
+                    .result
+                    .iter()
+                    .map(|point| point.id.clone().unwrap().point_id_options.unwrap())
+                    .map(|id| match id {
+                        PointIdOptions::Num(id) => id as usize,
+                        PointIdOptions::Uuid(_) => panic!("UUID in the response"),
+                    })
+                    .collect::<HashSet<_>>();
+
+                let missing_ids = ids
+                    .iter()
+                    .filter(|&id| !response_ids.contains(id))
+                    .collect::<Vec<_>>();
                 return Err(Invariant(format!(
-                    "Retrieve did not return all result {}",
-                    response.result.len()
+                    "Retrieve did not return all result {}/{}\nMissing ids: {:?}",
+                    response.result.len(),
+                    ids.len(),
+                    missing_ids
                 )));
             } else {
                 for point in response.result.iter() {
