@@ -39,8 +39,6 @@ Options:
           Optimizer indexing threshold
       --memmap-threshold <MEMMAP_THRESHOLD>
           Maximum size (in KiloBytes) of vectors to store in-memory per segment
-      --on-disk
-          If true - configure collection to read vectors, payload and indexes from disk. If set to false, the data will be loaded in RAM
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
           Timeout of gRPC client [default: 2000]
       --only-sparse

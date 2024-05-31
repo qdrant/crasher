@@ -102,7 +102,7 @@ impl Workload {
             )
             .await?;
             let collection_info = get_collection_info(client, &self.collection_name).await?;
-            log::info!("Collection info: {:?}", collection_info);
+            log::info!("Collection info: {:#?}", collection_info);
         }
 
         let current_count = get_points_count(client, &self.collection_name).await?;

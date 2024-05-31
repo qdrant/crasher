@@ -2,9 +2,10 @@ use crate::args::Args;
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::Cancelled;
 use crate::generators::{
-    random_dense_vector, random_filter, random_payload, random_sparse_vector, DENSE_VECTOR_NAME,
-    DENSE_VECTOR_NAME_BQ, DENSE_VECTOR_NAME_PQ, DENSE_VECTOR_NAME_SQ, DENSE_VECTOR_NAME_UINT8,
-    SPARSE_VECTOR_NAME, SPARSE_VECTOR_NAME_BIS,
+    random_dense_vector, random_filter, random_payload, random_sparse_vector, DENSE_VECTOR_NAME_BQ,
+    DENSE_VECTOR_NAME_ON_DISK, DENSE_VECTOR_NAME_PQ, DENSE_VECTOR_NAME_ROCKSDB,
+    DENSE_VECTOR_NAME_SQ, DENSE_VECTOR_NAME_UINT8, SPARSE_VECTOR_NAME,
+    SPARSE_VECTOR_NAME_INDEX_MMAP,
 };
 use anyhow::Context;
 use qdrant_client::client::QdrantClient;
@@ -157,7 +158,6 @@ pub async fn create_collection(
     vec_dim: usize,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
-    let on_disk = args.on_disk;
     let sparse_vectors_config = {
         let params = vec![
             (
@@ -165,16 +165,16 @@ pub async fn create_collection(
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(on_disk),
+                        on_disk: Some(true), // in memory
                     }),
                 },
             ),
             (
-                SPARSE_VECTOR_NAME_BIS.to_string(),
+                SPARSE_VECTOR_NAME_INDEX_MMAP.to_string(),
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(on_disk),
+                        on_disk: Some(false), // mmap index
                     }),
                 },
             ),
@@ -191,19 +191,30 @@ pub async fn create_collection(
             ef_construct: None,
             full_scan_threshold: None,
             max_indexing_threads: None,
-            on_disk: Some(on_disk),
+            on_disk: Some(false),
             payload_m: None,
         });
 
         let params: HashMap<_, _> = vec![
             (
-                DENSE_VECTOR_NAME.to_string(),
+                DENSE_VECTOR_NAME_ON_DISK.to_string(),
                 VectorParams {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(on_disk),
+                    on_disk: Some(true),
+                    datatype: None,
+                },
+            ),
+            (
+                DENSE_VECTOR_NAME_ROCKSDB.to_string(),
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(false), // in memory from rocksdb
                     datatype: None,
                 },
             ),
@@ -214,7 +225,7 @@ pub async fn create_collection(
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(on_disk),
+                    on_disk: Some(true),
                     datatype: Some(2), // UInt8
                 },
             ),
@@ -227,11 +238,11 @@ pub async fn create_collection(
                         quantization: Some(Quantization::Scalar(ScalarQuantization {
                             r#type: 1, // Int8
                             quantile: None,
-                            always_ram: Some(!on_disk),
+                            always_ram: Some(false),
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(on_disk),
+                    on_disk: Some(true),
                     datatype: None,
                 },
             ),
@@ -243,11 +254,11 @@ pub async fn create_collection(
                     quantization_config: Some(QuantizationConfig {
                         quantization: Some(Quantization::Product(ProductQuantization {
                             compression: 1, // x8
-                            always_ram: Some(!on_disk),
+                            always_ram: Some(false),
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(on_disk),
+                    on_disk: Some(true),
                     datatype: None,
                 },
             ),
@@ -258,11 +269,11 @@ pub async fn create_collection(
                     distance: Distance::Dot.into(),
                     quantization_config: Some(QuantizationConfig {
                         quantization: Some(Quantization::Binary(BinaryQuantization {
-                            always_ram: Some(!on_disk),
+                            always_ram: Some(false),
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(on_disk),
+                    on_disk: Some(true),
                     datatype: None,
                 },
             ),
@@ -298,7 +309,7 @@ pub async fn create_collection(
                 max_optimization_threads: None,
             }),
             shard_number: None,
-            on_disk_payload: Some(on_disk),
+            on_disk_payload: Some(false), // a bit faster
             wal_config: None,
             timeout: None,
             sharding_method: None,
@@ -353,7 +364,11 @@ pub async fn insert_points_batch(
             if !only_sparse_vectors {
                 // add all flavors of dense vectors
                 vectors_map.insert(
-                    DENSE_VECTOR_NAME.to_string(),
+                    DENSE_VECTOR_NAME_ON_DISK.to_string(),
+                    random_dense_vector(vec_dim).into(),
+                );
+                vectors_map.insert(
+                    DENSE_VECTOR_NAME_ROCKSDB.to_string(),
                     random_dense_vector(vec_dim).into(),
                 );
                 vectors_map.insert(
@@ -381,8 +396,8 @@ pub async fn insert_points_batch(
             );
 
             vectors_map.insert(
-                SPARSE_VECTOR_NAME_BIS.to_string(), // second regular one until we get more options
-                random_sparse_vector(vec_dim, 0.01).into(),
+                SPARSE_VECTOR_NAME_INDEX_MMAP.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
             );
 
             let vectors: Vectors = vectors_map.into();

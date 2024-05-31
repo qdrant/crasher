@@ -40,9 +40,6 @@ pub struct Args {
     /// Maximum size (in KiloBytes) of vectors to store in-memory per segment.
     #[arg(long)]
     pub memmap_threshold: Option<usize>,
-    /// If true - configure collection to read vectors, payload and indexes from disk. If set to false, the data will be loaded in RAM.
-    #[arg(long, default_value_t = true)]
-    pub on_disk: bool,
     /// Timeout of gRPC client
     #[arg(long, default_value_t = 2_000)]
     pub grpc_timeout_ms: usize,

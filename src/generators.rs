@@ -5,14 +5,19 @@ use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::{FieldCondition, Filter, Match};
 use rand::Rng;
 
-pub const DENSE_VECTOR_NAME: &str = "dense-vector";
+/// Dense vectors
+pub const DENSE_VECTOR_NAME_ON_DISK: &str = "dense-vector-on-disk";
+pub const DENSE_VECTOR_NAME_ROCKSDB: &str = "dense-vector-rocksdb";
 pub const DENSE_VECTOR_NAME_UINT8: &str = "dense-vector-uint8";
 pub const DENSE_VECTOR_NAME_SQ: &str = "dense-vector-sq";
 pub const DENSE_VECTOR_NAME_PQ: &str = "dense-vector-pq";
 pub const DENSE_VECTOR_NAME_BQ: &str = "dense-vector-bq";
+
+// Sparse vectors
 pub const SPARSE_VECTOR_NAME: &str = "sparse-vector";
-pub const SPARSE_VECTOR_NAME_BIS: &str = "sparse-vector-bis";
-pub const KEYWORD_PAYLOAD_KEY: &str = "a";
+pub const SPARSE_VECTOR_NAME_INDEX_MMAP: &str = "sparse-vector-index-mmap";
+
+pub const KEYWORD_PAYLOAD_KEY: &str = "crasher-payload-keyword";
 
 pub fn random_keyword(num_variants: usize) -> String {
     let mut rng = rand::thread_rng();
