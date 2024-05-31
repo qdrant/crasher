@@ -63,7 +63,7 @@ jobs:
         run: cargo build -r
       - name: Build Qdrant (debug)
         working-directory: /home/runner/work/crasher/crasher/qdrant
-        run: cargo build
+        run: cargo build --features "service_debug data-consistency-check"
       - name: Crash things
         working-directory: /home/runner/work/crasher/crasher
         shell: bash
