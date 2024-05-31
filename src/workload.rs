@@ -54,7 +54,7 @@ impl Workload {
             }
             let run = self.run(client, args.clone()).await;
             match run {
-                Ok(_) => {
+                Ok(()) => {
                     log::info!("Workload run finished");
                 }
                 Err(Cancelled) => {
@@ -227,10 +227,10 @@ impl Workload {
                     missing_ids
                 )));
             } else {
-                for point in response.result.iter() {
+                for point in &response.result {
                     let point_id = point.id.as_ref().expect("Point id should be present");
                     if let Some(vectors) = &point.vectors {
-                        for vector in vectors.vectors_options.iter() {
+                        for vector in &vectors.vectors_options {
                             match vector {
                                 VectorsOptions::Vector(anonymous) => {
                                     return Err(Invariant(format!(
