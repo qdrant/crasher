@@ -2,7 +2,7 @@ name: Crash
 
 on:
   push:
-    branches: [ "ci/notifications", "master" ]
+    branches: [ "master" ]
   schedule:
     # every day at 12 CET
     - cron: "0 14 * * *"
@@ -64,21 +64,21 @@ jobs:
       - name: Build Qdrant (debug)
         working-directory: /home/runner/work/crasher/crasher/qdrant
         run: cargo build --features "service_debug data-consistency-check"
-#      - name: Crash things
-#        working-directory: /home/runner/work/crasher/crasher
-#        shell: bash
-#        run: |
-#          crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
-#          ./crash-things.sh "/home/runner/work/crasher/crasher/qdrant/" "target/debug/qdrant" "0.2" "$crashing_time"
-#      - name: Upload logs on failure
-#        uses: actions/upload-artifact@v4
-#        if: failure() || cancelled()
-#        with:
-#          name: crasher-logs
-#          retention-days: 90 # default max value
-#          path: crasher_output.log
+      - name: Crash things
+        working-directory: /home/runner/work/crasher/crasher
+        shell: bash
+        run: |
+          crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
+          ./crash-things.sh "/home/runner/work/crasher/crasher/qdrant/" "target/debug/qdrant" "0.2" "$crashing_time"
+      - name: Upload logs on failure
+        uses: actions/upload-artifact@v4
+        if: failure() || cancelled()
+        with:
+          name: crasher-logs
+          retention-days: 90 # default max value
+          path: crasher_output.log
       - name: Send Notification
-        if: always()
+        if: failure() || cancelled()
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -89,7 +89,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "View the results <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|here>"
+                    "text": "Something is wrong.\nView the results <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|here>"
                   }
                 }
               ]
