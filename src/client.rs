@@ -27,6 +27,12 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
+#[derive(Copy, Clone)]
+pub enum VectorType {
+    Dense { dim: usize },
+    Sparse { dim: usize, sparsity: f64 },
+}
+
 /// Wait for collection to be indexed
 pub async fn wait_server_ready(
     client: &QdrantClient,
@@ -120,19 +126,27 @@ pub async fn get_points_count(
 pub async fn search_points(
     client: &QdrantClient,
     collection_name: &str,
-    vec_dim: usize,
+    vec_type: VectorType,
     payload_count: usize,
 ) -> Result<SearchResponse, anyhow::Error> {
-    // TODO generate sparse search as well
-
-    let query_vector = random_dense_vector(vec_dim);
+    let (indices, query_vector, vector_name) = match vec_type {
+        VectorType::Dense { dim } => (None, random_dense_vector(dim), DENSE_VECTOR_NAME_SQ),
+        VectorType::Sparse { dim, sparsity } => {
+            let (i, v) = random_sparse_vector(dim, sparsity).into_iter().unzip();
+            (
+                Some(qdrant_client::qdrant::SparseIndices { data: i }),
+                v,
+                SPARSE_VECTOR_NAME,
+            )
+        }
+    };
     let query_filter = random_filter(Some(payload_count));
 
     let response = client
         .search_points(&SearchPoints {
             collection_name: collection_name.to_string(),
             vector: query_vector,
-            vector_name: Some(DENSE_VECTOR_NAME_SQ.to_string()),
+            vector_name: Some(vector_name.to_string()),
             filter: query_filter,
             limit: 100,
             with_payload: Some(true.into()),
@@ -143,7 +157,7 @@ pub async fn search_points(
             read_consistency: None,
             timeout: None,
             shard_key_selector: None,
-            sparse_indices: None,
+            sparse_indices: indices,
         })
         .await
         .context(format!("Failed to search points on {}", collection_name))?;

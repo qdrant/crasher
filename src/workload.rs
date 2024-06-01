@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tokio::time::sleep;
 
 use crate::args::Args;
+use crate::client::VectorType;
 use crate::client::{
     create_collection, create_field_index, delete_points, get_collection_info, get_points_count,
     insert_points_batch, retrieve_points, search_points, set_payload,
@@ -22,6 +23,7 @@ pub struct Workload {
     search_count: usize,
     points_count: usize,
     vec_dim: usize,
+    vec_sparsity: f64,
     payload_count: usize,
     write_ordering: Option<WriteOrdering>,
     stopped: Arc<AtomicBool>,
@@ -31,6 +33,7 @@ impl Workload {
     pub fn new(stopped: Arc<AtomicBool>, points_count: usize) -> Self {
         let collection_name = "workload-crasher".to_string();
         let vec_dim = 1024;
+        let vec_sparsity = 1f64;
         let payload_count = 1;
         let search_count = 10;
         let write_ordering = None; // default
@@ -39,6 +42,7 @@ impl Workload {
             search_count,
             points_count,
             vec_dim,
+            vec_sparsity,
             payload_count,
             write_ordering,
             stopped,
@@ -114,17 +118,19 @@ impl Workload {
             self.consistency_check(client, current_count).await?;
 
             log::info!("Run: pre search random vector");
-            for _i in 0..self.search_count {
+            for i in 0..self.search_count {
                 if self.stopped.load(Ordering::Relaxed) {
                     return Err(Cancelled);
                 }
-                search_points(
-                    client,
-                    &self.collection_name,
-                    self.vec_dim,
-                    self.payload_count,
-                )
-                .await?;
+                let vec_type = if i % 2 == 0 {
+                    VectorType::Dense { dim: self.vec_dim }
+                } else {
+                    VectorType::Sparse {
+                        dim: self.vec_dim,
+                        sparsity: self.vec_sparsity,
+                    }
+                };
+                search_points(client, &self.collection_name, vec_type, self.payload_count).await?;
             }
 
             log::info!("Run: delete existing points");
@@ -176,17 +182,19 @@ impl Workload {
         self.consistency_check(client, self.points_count).await?;
 
         log::info!("Run: post search random vector");
-        for _i in 0..self.search_count {
+        for i in 0..self.search_count {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
             }
-            search_points(
-                client,
-                &self.collection_name,
-                self.vec_dim,
-                self.payload_count,
-            )
-            .await?;
+            let vec_type = if i % 2 == 0 {
+                VectorType::Dense { dim: self.vec_dim }
+            } else {
+                VectorType::Sparse {
+                    dim: self.vec_dim,
+                    sparsity: self.vec_sparsity,
+                }
+            };
+            search_points(client, &self.collection_name, vec_type, self.payload_count).await?;
         }
 
         log::info!("Workload finished");
