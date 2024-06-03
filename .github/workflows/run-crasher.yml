@@ -2,7 +2,7 @@ name: Crash
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "test/persistence-bug" ]
   schedule:
     # every day at 12 CET
     - cron: "0 14 * * *"
@@ -10,7 +10,7 @@ on:
     inputs:
       qdrant_version:
         description: "Version of qdrant to checkout (tags/v1.6.1, <commit-id>, my-branch)"
-        default: dev
+        default: "test/persistence-bug"
       crashing_time:
         description: "Duration in seconds, default is 2400s (40 min) "
         default: 2400
@@ -27,7 +27,7 @@ jobs:
         run: |
           qdrant_version="${{ inputs.qdrant_version }}"
           if [ -z "$qdrant_version" ]; then
-            qdrant_version="dev"
+            qdrant_version="test/persistence-bug"
           fi
           
           crashing_time="${{ inputs.crashing_time }}"
