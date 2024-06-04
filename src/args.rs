@@ -46,4 +46,7 @@ pub struct Args {
     /// Whether to only upsert sparse vectors
     #[arg(long, default_value_t = false)]
     pub only_sparse: bool,
+    /// Whether to perform extra consistency check
+    #[arg(long, default_value_t = false)]
+    pub consistency_check: bool,
 }

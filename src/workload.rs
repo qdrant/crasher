@@ -107,10 +107,12 @@ impl Workload {
 
         let current_count = get_points_count(client, &self.collection_name).await?;
         if current_count != 0 {
-            // can be disabled if qdrant is running internal data consistency check on the server side
-            // `cargo run --features data-consistency-check`
-            log::info!("Run: pre consistency check ({})", current_count);
-            self.consistency_check(client, current_count).await?;
+            if args.consistency_check {
+                // can be disabled if qdrant is running internal data consistency check on the server side
+                // `cargo run --features data-consistency-check`
+                log::info!("Run: pre consistency check ({})", current_count);
+                self.consistency_check(client, current_count).await?;
+            }
 
             log::info!("Run: delete existing points ({})", current_count);
             delete_points(client, &self.collection_name, current_count).await?;
