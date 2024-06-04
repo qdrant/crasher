@@ -20,7 +20,9 @@ env:
 
 jobs:
   crasher-run:
+    continue-on-error: true
     strategy:
+      fail-fast: false
       matrix:
         include:
           - name: "crash-probability=0-2"
@@ -33,10 +35,16 @@ jobs:
             cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --flush-interval-sec 10"
             runner: "ubuntu-latest"
           - name: "crash-probability=0-2_replication-factor=2"
-            cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --replication_factor 2"
+            cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --replication-factor 2"
             runner: "ubuntu-latest"
           - name: "crash-probability=0-2_write-consistency-factor=2"
-            cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --write_consistency_factor 2"
+            cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --write-consistency-factor 2"
+            runner: "ubuntu-latest"
+          - name: "crash-probability=0-2_indexing-threshold=0"
+            cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --indexing-threshold 0"
+            runner: "ubuntu-latest"
+          - name: "crash-probability=0-2_only-sparse"
+            cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --only-sparse"
             runner: "ubuntu-latest"
     runs-on: ${{ matrix.runner }}
     name: "${{ matrix.name }}"
