@@ -2,13 +2,11 @@
 
 set -e
 
-QDRANT_DIR=${1:-"./qdrant/"}
-QDRANT_EXEC=${2:-"target/debug/qdrant"}
-CRASH_PROBABILITY=${3:-"0.2"}
+CRASHER_DEFAULT_CMD="cargo run -r -- --working-dir ./qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2"
+CRASHER_CMD=${1:-"$CRASHER_DEFAULT_CMD"}
+RUN_TIME=${2:-300}
 LOG_FILE="crasher_output.log"
-RUN_TIME=${4:-300}
 
-CRASHER_CMD="cargo run -r -- --working-dir $QDRANT_DIR --exec-path $QDRANT_EXEC --crash-probability $CRASH_PROBABILITY"
 echo "$CRASHER_CMD"
 $CRASHER_CMD > $LOG_FILE 2>&1 &
 pid=$!

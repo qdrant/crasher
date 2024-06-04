@@ -10,7 +10,7 @@ on:
     inputs:
       qdrant_version:
         description: "Version of qdrant to checkout (tags/v1.6.1, <commit-id>, my-branch)"
-        default: "test/persistence-bug"
+        default: dev
       crashing_time:
         description: "Duration in seconds, default is 2400s (40 min) "
         default: 2400
@@ -19,15 +19,21 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  crasher-run:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crasher_cmd:
+          - "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2"
+          - "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --flush-interval-sec 1"
+          - "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --flush-interval-sec 10"
     steps:
       - name: Process inputs
         id: default_inputs
         run: |
           qdrant_version="${{ inputs.qdrant_version }}"
           if [ -z "$qdrant_version" ]; then
-            qdrant_version="test/persistence-bug"
+            qdrant_version=dev
           fi
           
           crashing_time="${{ inputs.crashing_time }}"
@@ -64,12 +70,13 @@ jobs:
       - name: Build Qdrant (debug)
         working-directory: /home/runner/work/crasher/crasher/qdrant
         run: cargo build --features "service_debug data-consistency-check"
-      - name: Crash things
+      - name: Crash things all defaults
         working-directory: /home/runner/work/crasher/crasher
         shell: bash
         run: |
           crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
-          ./crash-things.sh "/home/runner/work/crasher/crasher/qdrant/" "target/debug/qdrant" "0.2" "$crashing_time"
+          crasher_cmd=${{ matrix.crasher_cmd }}
+          ./crash-things.sh "$crasher_cmd" "$crashing_time"
       - name: Upload logs on failure
         uses: actions/upload-artifact@v4
         if: failure() || cancelled()
@@ -77,23 +84,23 @@ jobs:
           name: crasher-logs
           retention-days: 90 # default max value
           path: crasher_output.log
-      - name: Send Notification
-        if: failure() || cancelled()
-        uses: slackapi/slack-github-action@v1.26.0
-        with:
-          payload: |
-            {
-              "text": "Crasher run status: ${{ job.status }}",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "Something is wrong.\nView the results <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|here>"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.CRASHER_CHANNEL_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+#      - name: Send Notification
+#        if: failure() || cancelled()
+#        uses: slackapi/slack-github-action@v1.26.0
+#        with:
+#          payload: |
+#            {
+#              "text": "Crasher run status: ${{ job.status }}",
+#              "blocks": [
+#                {
+#                  "type": "section",
+#                  "text": {
+#                    "type": "mrkdwn",
+#                    "text": "Something is wrong.\nView the results <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|here>"
+#                  }
+#                }
+#              ]
+#            }
+#        env:
+#          SLACK_WEBHOOK_URL: ${{ secrets.CRASHER_CHANNEL_WEBHOOK_URL }}
+#          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
