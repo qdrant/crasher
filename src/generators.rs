@@ -16,6 +16,16 @@ pub const DENSE_VECTOR_NAME_BQ: &str = "dense-vector-bq";
 // Sparse vectors
 pub const SPARSE_VECTOR_NAME: &str = "sparse-vector";
 pub const SPARSE_VECTOR_NAME_INDEX_MMAP: &str = "sparse-vector-index-mmap";
+pub const SPARSE_VECTOR_NAME_ONE: &str = "sparse-vector-one";
+pub const SPARSE_VECTOR_NAME_TWO: &str = "sparse-vector-two";
+pub const SPARSE_VECTOR_NAME_THREE: &str = "sparse-vector-three";
+pub const SPARSE_VECTOR_NAME_FOUR: &str = "sparse-vector-four";
+pub const SPARSE_VECTOR_NAME_FIVE: &str = "sparse-vector-five";
+pub const SPARSE_VECTOR_NAME_SIX: &str = "sparse-vector-six";
+pub const SPARSE_VECTOR_NAME_SEVEN: &str = "sparse-vector-seven";
+pub const SPARSE_VECTOR_NAME_EIGHT: &str = "sparse-vector-eight";
+pub const SPARSE_VECTOR_NAME_NINE: &str = "sparse-vector-nine";
+pub const SPARSE_VECTOR_NAME_TEN: &str = "sparse-vector-ten";
 
 pub const KEYWORD_PAYLOAD_KEY: &str = "crasher-payload-keyword";
 

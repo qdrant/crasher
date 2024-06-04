@@ -32,7 +32,7 @@ impl Workload {
         let collection_name = "workload-crasher".to_string();
         let vec_dim = 1024;
         let payload_count = 1;
-        let search_count = 10;
+        let search_count = 1;
         let write_ordering = None; // default
         Workload {
             collection_name,
@@ -107,27 +107,12 @@ impl Workload {
 
         let current_count = get_points_count(client, &self.collection_name).await?;
         if current_count != 0 {
-            log::info!(
-                "Run: pre integrity check ({} existing points)",
-                current_count
-            );
+            // can be disabled if qdrant is running internal data consistency check on the server side
+            // `cargo run --features data-consistency-check`
+            log::info!("Run: pre consistency check ({})", current_count);
             self.consistency_check(client, current_count).await?;
 
-            log::info!("Run: pre search random vector");
-            for _i in 0..self.search_count {
-                if self.stopped.load(Ordering::Relaxed) {
-                    return Err(Cancelled);
-                }
-                search_points(
-                    client,
-                    &self.collection_name,
-                    self.vec_dim,
-                    self.payload_count,
-                )
-                .await?;
-            }
-
-            log::info!("Run: delete existing points");
+            log::info!("Run: delete existing points ({})", current_count);
             delete_points(client, &self.collection_name, current_count).await?;
         }
 
@@ -172,9 +157,6 @@ impl Workload {
             .await?;
         }
 
-        log::info!("Run: post consistency check");
-        self.consistency_check(client, self.points_count).await?;
-
         log::info!("Run: post search random vector");
         for _i in 0..self.search_count {
             if self.stopped.load(Ordering::Relaxed) {
@@ -183,6 +165,7 @@ impl Workload {
             search_points(
                 client,
                 &self.collection_name,
+                args.only_sparse,
                 self.vec_dim,
                 self.payload_count,
             )

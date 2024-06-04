@@ -11,7 +11,7 @@ pub struct Args {
     #[arg(long)]
     pub exec_path: String,
     /// Probability to kill running instance
-    #[arg(long, default_value_t = 0.1)]
+    #[arg(long, default_value_t = 0.3)]
     pub crash_probability: f64,
     /// The time in second to sleep between crashes attempt
     #[arg(long, default_value_t = 5)]
@@ -20,7 +20,7 @@ pub struct Args {
     #[arg(long, default_value = "http://localhost:6334")]
     pub uris: Vec<String>,
     /// Number of points to generate
-    #[arg(long, default_value_t = 12_000)]
+    #[arg(long, default_value_t = 5_000)]
     pub points_count: usize,
     /// Configure the flush interval for collections
     #[arg(long, default_value_t = 5)]

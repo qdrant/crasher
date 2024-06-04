@@ -4,8 +4,11 @@ use crate::crasher_error::CrasherError::Cancelled;
 use crate::generators::{
     random_dense_vector, random_filter, random_payload, random_sparse_vector, DENSE_VECTOR_NAME_BQ,
     DENSE_VECTOR_NAME_ON_DISK, DENSE_VECTOR_NAME_PQ, DENSE_VECTOR_NAME_ROCKSDB,
-    DENSE_VECTOR_NAME_SQ, DENSE_VECTOR_NAME_UINT8, SPARSE_VECTOR_NAME,
-    SPARSE_VECTOR_NAME_INDEX_MMAP,
+    DENSE_VECTOR_NAME_SQ, DENSE_VECTOR_NAME_UINT8, SPARSE_VECTOR_NAME, SPARSE_VECTOR_NAME_EIGHT,
+    SPARSE_VECTOR_NAME_FIVE, SPARSE_VECTOR_NAME_FOUR, SPARSE_VECTOR_NAME_INDEX_MMAP,
+    SPARSE_VECTOR_NAME_NINE, SPARSE_VECTOR_NAME_ONE, SPARSE_VECTOR_NAME_SEVEN,
+    SPARSE_VECTOR_NAME_SIX, SPARSE_VECTOR_NAME_TEN, SPARSE_VECTOR_NAME_THREE,
+    SPARSE_VECTOR_NAME_TWO,
 };
 use anyhow::Context;
 use qdrant_client::client::QdrantClient;
@@ -17,8 +20,8 @@ use qdrant_client::qdrant::{
     BinaryQuantization, CollectionInfo, CountPoints, CreateCollection, Distance, FieldType,
     GetResponse, HnswConfigDiff, OptimizersConfigDiff, PointId, PointStruct, PointsIdsList,
     PointsSelector, ProductQuantization, QuantizationConfig, ScalarQuantization, SearchPoints,
-    SearchResponse, SparseIndexConfig, SparseVectorConfig, SparseVectorParams, Vector,
-    VectorParams, VectorParamsMap, Vectors, VectorsConfig, WithPayloadSelector,
+    SearchResponse, SparseIndexConfig, SparseIndices, SparseVectorConfig, SparseVectorParams,
+    Vector, VectorParams, VectorParamsMap, Vectors, VectorsConfig, WithPayloadSelector,
     WithVectorsSelector, WriteOrdering,
 };
 use std::collections::HashMap;
@@ -120,20 +123,38 @@ pub async fn get_points_count(
 pub async fn search_points(
     client: &QdrantClient,
     collection_name: &str,
+    only_sparse: bool,
     vec_dim: usize,
     payload_count: usize,
 ) -> Result<SearchResponse, anyhow::Error> {
-    // TODO generate sparse search as well
+    // TODO use batch search to target all named vectors
+    let (query_vector, sparse_indices, vector_name) = if only_sparse {
+        let sparse_vector = random_sparse_vector(vec_dim, 0.1);
+        // split values & indices
+        let data: Vec<_> = sparse_vector.iter().map(|(idx, _)| *idx).collect();
+        let sparse_indices = SparseIndices { data };
+        let sparse_values = sparse_vector.iter().map(|(_, val)| *val).collect();
+        (
+            sparse_values,
+            Some(sparse_indices),
+            SPARSE_VECTOR_NAME.to_string(),
+        )
+    } else {
+        (
+            random_dense_vector(vec_dim),
+            None,
+            DENSE_VECTOR_NAME_SQ.to_string(),
+        )
+    };
 
-    let query_vector = random_dense_vector(vec_dim);
-    let query_filter = random_filter(Some(payload_count));
+    let filter = random_filter(Some(payload_count));
 
     let response = client
         .search_points(&SearchPoints {
             collection_name: collection_name.to_string(),
             vector: query_vector,
-            vector_name: Some(DENSE_VECTOR_NAME_SQ.to_string()),
-            filter: query_filter,
+            vector_name: Some(vector_name),
+            filter,
             limit: 100,
             with_payload: Some(true.into()),
             params: None,
@@ -143,7 +164,7 @@ pub async fn search_points(
             read_consistency: None,
             timeout: None,
             shard_key_selector: None,
-            sparse_indices: None,
+            sparse_indices,
         })
         .await
         .context(format!("Failed to search points on {}", collection_name))?;
@@ -171,6 +192,96 @@ pub async fn create_collection(
             ),
             (
                 SPARSE_VECTOR_NAME_INDEX_MMAP.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // mmap index
+                    }),
+                },
+            ),
+            (
+                SPARSE_VECTOR_NAME_ONE.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // mmap index
+                    }),
+                },
+            ),
+            (
+                SPARSE_VECTOR_NAME_TWO.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // mmap index
+                    }),
+                },
+            ),
+            (
+                SPARSE_VECTOR_NAME_THREE.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // mmap index
+                    }),
+                },
+            ),
+            (
+                SPARSE_VECTOR_NAME_FOUR.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // mmap index
+                    }),
+                },
+            ),
+            (
+                SPARSE_VECTOR_NAME_FIVE.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // mmap index
+                    }),
+                },
+            ),
+            (
+                SPARSE_VECTOR_NAME_SIX.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // mmap index
+                    }),
+                },
+            ),
+            (
+                SPARSE_VECTOR_NAME_SEVEN.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // mmap index
+                    }),
+                },
+            ),
+            (
+                SPARSE_VECTOR_NAME_EIGHT.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // mmap index
+                    }),
+                },
+            ),
+            (
+                SPARSE_VECTOR_NAME_NINE.to_string(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // mmap index
+                    }),
+                },
+            ),
+            (
+                SPARSE_VECTOR_NAME_TEN.to_string(),
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
@@ -225,7 +336,7 @@ pub async fn create_collection(
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true),
+                    on_disk: Some(false),
                     datatype: Some(2), // UInt8
                 },
             ),
@@ -242,7 +353,7 @@ pub async fn create_collection(
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true),
+                    on_disk: Some(false),
                     datatype: None,
                 },
             ),
@@ -258,7 +369,7 @@ pub async fn create_collection(
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true),
+                    on_disk: Some(false),
                     datatype: None,
                 },
             ),
@@ -273,7 +384,7 @@ pub async fn create_collection(
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true),
+                    on_disk: Some(false),
                     datatype: None,
                 },
             ),
@@ -397,6 +508,56 @@ pub async fn insert_points_batch(
 
             vectors_map.insert(
                 SPARSE_VECTOR_NAME_INDEX_MMAP.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
+            );
+
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME_ONE.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
+            );
+
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME_TWO.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
+            );
+
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME_THREE.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
+            );
+
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME_FOUR.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
+            );
+
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME_FIVE.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
+            );
+
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME_SIX.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
+            );
+
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME_SEVEN.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
+            );
+
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME_EIGHT.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
+            );
+
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME_NINE.to_string(),
+                random_sparse_vector(vec_dim, 0.1).into(),
+            );
+
+            vectors_map.insert(
+                SPARSE_VECTOR_NAME_TEN.to_string(),
                 random_sparse_vector(vec_dim, 0.1).into(),
             );
 
