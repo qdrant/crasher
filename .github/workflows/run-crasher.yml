@@ -75,7 +75,7 @@ jobs:
         shell: bash
         run: |
           crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
-          crasher_cmd=${{ matrix.crasher_cmd }}
+          crasher_cmd="${{ matrix.crasher_cmd }}"
           ./crash-things.sh "$crasher_cmd" "$crashing_time"
       - name: Upload logs on failure
         uses: actions/upload-artifact@v4
