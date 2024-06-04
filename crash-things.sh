@@ -4,7 +4,7 @@ set -e
 
 QDRANT_DIR=${1:-"./qdrant/"}
 QDRANT_EXEC=${2:-"target/debug/qdrant"}
-CRASH_PROBABILITY=${3:-"0.2"}
+CRASH_PROBABILITY=${3:-"0.3"}
 LOG_FILE="crasher_output.log"
 RUN_TIME=${4:-300}
 

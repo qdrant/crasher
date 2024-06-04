@@ -69,7 +69,7 @@ jobs:
         shell: bash
         run: |
           crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
-          ./crash-things.sh "/home/runner/work/crasher/crasher/qdrant/" "target/debug/qdrant" "0.2" "$crashing_time"
+          ./crash-things.sh "/home/runner/work/crasher/crasher/qdrant/" "target/debug/qdrant" "0.3" "$crashing_time"
       - name: Upload logs on failure
         uses: actions/upload-artifact@v4
         if: failure() || cancelled()
