@@ -34,10 +34,10 @@ jobs:
             runner: "ubuntu-latest"
           - name: "crash-probability=0-2_replication-factor=2"
             cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --replication_factor 2"
-            runner: [self-hosted, linux, x64]
+            runner: "ubuntu-latest"
           - name: "crash-probability=0-2_write-consistency-factor=2"
             cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --write_consistency_factor 2"
-            runner: [self-hosted, linux, x64]
+            runner: "ubuntu-latest"
     runs-on: ${{ matrix.runner }}
     name: "${{ matrix.name }}"
     steps:
