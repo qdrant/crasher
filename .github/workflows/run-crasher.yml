@@ -20,13 +20,26 @@ env:
 
 jobs:
   crasher-run:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        crasher_cmd:
-          - "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2"
-          - "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --flush-interval-sec 1"
-          - "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --flush-interval-sec 10"
+        include:
+          - name: "crash-probability=0-2"
+            cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2"
+            runner: "ubuntu-latest"
+          - name: "crash-probability=0-2_flush-interval-sec=1"
+            cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --flush-interval-sec 1"
+            runner: "ubuntu-latest"
+          - name: "crash-probability=0-2_flush-interval-sec=10"
+            cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --flush-interval-sec 10"
+            runner: "ubuntu-latest"
+          - name: "crash-probability=0-2_replication-factor=2"
+            cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --replication_factor 2"
+            runner: [self-hosted, linux, x64]
+          - name: "crash-probability=0-2_write-consistency-factor=2"
+            cmd: "cargo run -r -- --working-dir /home/runner/work/crasher/crasher/qdrant/ --exec-path target/debug/qdrant --crash-probability 0.2 --write_consistency_factor 2"
+            runner: [self-hosted, linux, x64]
+    runs-on: ${{ matrix.runner }}
+    name: "${{ matrix.name }}"
     steps:
       - name: Process inputs
         id: default_inputs
@@ -75,13 +88,13 @@ jobs:
         shell: bash
         run: |
           crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
-          crasher_cmd="${{ matrix.crasher_cmd }}"
+          crasher_cmd="${{ matrix.cmd }}"
           ./crash-things.sh "$crasher_cmd" "$crashing_time"
       - name: Upload logs on failure
         uses: actions/upload-artifact@v4
         if: failure() || cancelled()
         with:
-          name: crasher-logs
+          name: "crasher-logs-${{ matrix.name }}"
           retention-days: 90 # default max value
           path: crasher_output.log
 #      - name: Send Notification
