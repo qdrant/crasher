@@ -1,9 +1,15 @@
 use core::option::Option;
 use core::option::Option::{None, Some};
 use qdrant_client::client::Payload;
+use qdrant_client::prelude::Distance;
+use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::r#match::MatchValue;
-use qdrant_client::qdrant::{FieldCondition, Filter, Match};
+use qdrant_client::qdrant::{
+    BinaryQuantization, FieldCondition, Filter, HnswConfigDiff, Match, ProductQuantization,
+    QuantizationConfig, ScalarQuantization, SparseIndexConfig, SparseVectorParams, VectorParams,
+};
 use rand::Rng;
+use std::collections::HashMap;
 
 /// Dense vectors
 pub const DENSE_VECTOR_NAME_ON_DISK: &str = "dense-vector-on-disk";
@@ -13,21 +19,193 @@ pub const DENSE_VECTOR_NAME_SQ: &str = "dense-vector-sq";
 pub const DENSE_VECTOR_NAME_PQ: &str = "dense-vector-pq";
 pub const DENSE_VECTOR_NAME_BQ: &str = "dense-vector-bq";
 
-// Sparse vectors
-pub const SPARSE_VECTOR_NAME: &str = "sparse-vector";
-pub const SPARSE_VECTOR_NAME_INDEX_MMAP: &str = "sparse-vector-index-mmap";
-pub const SPARSE_VECTOR_NAME_ONE: &str = "sparse-vector-one";
-pub const SPARSE_VECTOR_NAME_TWO: &str = "sparse-vector-two";
-pub const SPARSE_VECTOR_NAME_THREE: &str = "sparse-vector-three";
-pub const SPARSE_VECTOR_NAME_FOUR: &str = "sparse-vector-four";
-pub const SPARSE_VECTOR_NAME_FIVE: &str = "sparse-vector-five";
-pub const SPARSE_VECTOR_NAME_SIX: &str = "sparse-vector-six";
-pub const SPARSE_VECTOR_NAME_SEVEN: &str = "sparse-vector-seven";
-pub const SPARSE_VECTOR_NAME_EIGHT: &str = "sparse-vector-eight";
-pub const SPARSE_VECTOR_NAME_NINE: &str = "sparse-vector-nine";
-pub const SPARSE_VECTOR_NAME_TEN: &str = "sparse-vector-ten";
+/// Sparse vectors
+pub const SPARSE_VECTOR_NAME_INDEX_DISK: &str = "sparse-vector-index-disk";
+pub const SPARSE_VECTOR_NAME_INDEX_MEMORY: &str = "sparse-vector-index-memory";
 
 pub const KEYWORD_PAYLOAD_KEY: &str = "crasher-payload-keyword";
+
+#[derive(Debug)]
+pub struct TestNamedVectors {
+    dense_vectors: HashMap<String, VectorParams>,
+    sparse_vectors: HashMap<String, SparseVectorParams>,
+}
+
+impl TestNamedVectors {
+    pub fn new(duplication_factor: usize, vec_dim: usize) -> Self {
+        let mut sparse_vectors = HashMap::new();
+        let mut dense_vectors = HashMap::new();
+
+        let hnsw_config = Some(HnswConfigDiff {
+            m: Some(32),
+            ef_construct: None,
+            full_scan_threshold: None,
+            max_indexing_threads: None,
+            on_disk: Some(false),
+            payload_m: None,
+        });
+
+        // dense vectors on disk
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", DENSE_VECTOR_NAME_ON_DISK, i);
+            dense_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(true), // on disk
+                    datatype: None,
+                },
+            );
+        }
+
+        // dense vector rocksdb
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", DENSE_VECTOR_NAME_ROCKSDB, i);
+            dense_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(false), // rocksdb
+                    datatype: None,
+                },
+            );
+        }
+
+        // dense vectors uint8
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", DENSE_VECTOR_NAME_UINT8, i);
+            dense_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(true), // TODO could be flipped
+                    datatype: Some(2),   // UInt8
+                },
+            );
+        }
+
+        // dense vectors SQ
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", DENSE_VECTOR_NAME_SQ, i);
+            dense_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Scalar(ScalarQuantization {
+                            r#type: 1, // Int8
+                            quantile: None,
+                            always_ram: Some(false),
+                        })),
+                    }),
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(true), // TODO could be flipped
+                    datatype: None,
+                },
+            );
+        }
+
+        // dense vectors PQ
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", DENSE_VECTOR_NAME_PQ, i);
+            dense_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Product(ProductQuantization {
+                            compression: 1, // x8
+                            always_ram: Some(false),
+                        })),
+                    }),
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(true), // TODO could be flipped
+                    datatype: None,
+                },
+            );
+        }
+
+        // dense vectors BQ
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", DENSE_VECTOR_NAME_BQ, i);
+            dense_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Binary(BinaryQuantization {
+                            always_ram: Some(false),
+                        })),
+                    }),
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(true), // TODO could be flipped
+                    datatype: None,
+                },
+            );
+        }
+
+        // sparse vector index on disk
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", SPARSE_VECTOR_NAME_INDEX_DISK, i);
+            sparse_vectors.insert(
+                name.clone(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(true), // on disk
+                    }),
+                },
+            );
+        }
+
+        // sparse vector index in memory
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", SPARSE_VECTOR_NAME_INDEX_MEMORY, i);
+            sparse_vectors.insert(
+                name.clone(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // in memory
+                    }),
+                },
+            );
+        }
+
+        Self {
+            dense_vectors,
+            sparse_vectors,
+        }
+    }
+
+    pub fn sparse_vectors(&self) -> HashMap<String, SparseVectorParams> {
+        self.sparse_vectors.clone()
+    }
+
+    pub fn dense_vectors(&self) -> HashMap<String, VectorParams> {
+        self.dense_vectors.clone()
+    }
+
+    pub fn sparse_vector_names(&self) -> Vec<String> {
+        self.sparse_vectors.keys().cloned().collect()
+    }
+
+    pub fn dense_vector_names(&self) -> Vec<String> {
+        self.dense_vectors.keys().cloned().collect()
+    }
+}
 
 pub fn random_keyword(num_variants: usize) -> String {
     let mut rng = rand::thread_rng();

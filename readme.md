@@ -20,13 +20,13 @@ Options:
       --exec-path <EXEC_PATH>
           Path to executable binary relative to `working_dir`
       --crash-probability <CRASH_PROBABILITY>
-          Probability to kill running instance [default: 0.1]
+          Probability to kill running instance [default: 0.3]
       --sleep-duration-between-crash-sec <SLEEP_DURATION_BETWEEN_CRASH_SEC>
           The time in second to sleep between crashes attempt [default: 5]
       --uris <URIS>
           Qdrant gRPC service URIs (can be used several times to specify several URIs) [default: http://localhost:6334]
       --points-count <POINTS_COUNT>
-          Number of points to generate [default: 12000]
+          Number of points to generate [default: 5000]
       --flush-interval-sec <FLUSH_INTERVAL_SEC>
           Configure the flush interval for collections [default: 5]
       --segment-count <SEGMENT_COUNT>
@@ -43,6 +43,10 @@ Options:
           Timeout of gRPC client [default: 2000]
       --only-sparse
           Whether to only upsert sparse vectors
+      --duplication-factor <DUPLICATION_FACTOR>
+          Duplication factor for generating additional named vectors [default: 3]
+      --consistency-check
+          Whether to perform extra consistency check
   -h, --help
           Print help
   -V, --version

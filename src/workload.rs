@@ -11,14 +11,15 @@ use tokio::time::sleep;
 use crate::args::Args;
 use crate::client::{
     create_collection, create_field_index, delete_points, get_collection_info, get_points_count,
-    insert_points_batch, retrieve_points, search_points, set_payload,
+    insert_points_batch, retrieve_points, search_batch_points, set_payload,
 };
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
-use crate::generators::KEYWORD_PAYLOAD_KEY;
+use crate::generators::{TestNamedVectors, KEYWORD_PAYLOAD_KEY};
 
 pub struct Workload {
     collection_name: String,
+    test_named_vectors: TestNamedVectors,
     search_count: usize,
     points_count: usize,
     vec_dim: usize,
@@ -28,14 +29,16 @@ pub struct Workload {
 }
 
 impl Workload {
-    pub fn new(stopped: Arc<AtomicBool>, points_count: usize) -> Self {
+    pub fn new(stopped: Arc<AtomicBool>, duplication_factor: usize, points_count: usize) -> Self {
         let collection_name = "workload-crasher".to_string();
         let vec_dim = 1024;
         let payload_count = 1;
         let search_count = 1;
+        let test_named_vectors = TestNamedVectors::new(duplication_factor, vec_dim);
         let write_ordering = None; // default
         Workload {
             collection_name,
+            test_named_vectors,
             search_count,
             points_count,
             vec_dim,
@@ -93,7 +96,13 @@ impl Workload {
         // create and populate collection if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
             log::info!("Creating workload collection");
-            create_collection(client, &self.collection_name, self.vec_dim, args.clone()).await?;
+            create_collection(
+                client,
+                &self.collection_name,
+                &self.test_named_vectors,
+                args.clone(),
+            )
+            .await?;
             create_field_index(
                 client,
                 &self.collection_name,
@@ -126,6 +135,7 @@ impl Workload {
             self.vec_dim,
             0, // no payload at first
             args.only_sparse,
+            &self.test_named_vectors,
             None,
             self.stopped.clone(),
         )
@@ -164,9 +174,10 @@ impl Workload {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
             }
-            search_points(
+            search_batch_points(
                 client,
                 &self.collection_name,
+                &self.test_named_vectors,
                 args.only_sparse,
                 self.vec_dim,
                 self.payload_count,
