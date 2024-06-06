@@ -41,7 +41,7 @@ pub struct Args {
     #[arg(long)]
     pub memmap_threshold: Option<usize>,
     /// Timeout of gRPC client
-    #[arg(long, default_value_t = 2_000)]
+    #[arg(long, default_value_t = 5_000)]
     pub grpc_timeout_ms: usize,
     /// Whether to only upsert sparse vectors
     #[arg(long, default_value_t = false)]

@@ -40,7 +40,7 @@ Options:
       --memmap-threshold <MEMMAP_THRESHOLD>
           Maximum size (in KiloBytes) of vectors to store in-memory per segment
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
-          Timeout of gRPC client [default: 2000]
+          Timeout of gRPC client [default: 5000]
       --only-sparse
           Whether to only upsert sparse vectors
       --duplication-factor <DUPLICATION_FACTOR>
