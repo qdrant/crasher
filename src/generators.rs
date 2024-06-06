@@ -5,13 +5,16 @@ use qdrant_client::prelude::Distance;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::{
-    BinaryQuantization, FieldCondition, Filter, HnswConfigDiff, Match, ProductQuantization,
-    QuantizationConfig, ScalarQuantization, SparseIndexConfig, SparseVectorParams, VectorParams,
+    BinaryQuantization, FieldCondition, Filter, HnswConfigDiff, Match, MultiVectorConfig,
+    ProductQuantization, QuantizationConfig, ScalarQuantization, SparseIndexConfig,
+    SparseVectorParams, VectorParams,
 };
 use rand::Rng;
 use std::collections::HashMap;
 
-/// Dense vectors
+// TODO do not generate vector configuration manually but create all possibility exhaustively
+
+/// Dense vectors base names
 pub const DENSE_VECTOR_NAME_ON_DISK: &str = "dense-vector-on-disk";
 pub const DENSE_VECTOR_NAME_ROCKSDB: &str = "dense-vector-rocksdb";
 pub const DENSE_VECTOR_NAME_UINT8: &str = "dense-vector-uint8";
@@ -20,9 +23,14 @@ pub const DENSE_VECTOR_NAME_SQ: &str = "dense-vector-sq";
 pub const DENSE_VECTOR_NAME_PQ: &str = "dense-vector-pq";
 pub const DENSE_VECTOR_NAME_BQ: &str = "dense-vector-bq";
 
-/// Sparse vectors
+/// Sparse vectors base names
 pub const SPARSE_VECTOR_NAME_INDEX_DISK: &str = "sparse-vector-index-disk";
 pub const SPARSE_VECTOR_NAME_INDEX_MEMORY: &str = "sparse-vector-index-memory";
+
+/// Multi vectors base names
+pub const MULTI_VECTOR_NAME_ON_DISK: &str = "multi-dense-vector-on-disk";
+pub const MULTI_VECTOR_NAME_ROCKSDB: &str = "multi-dense-vector-rocksdb";
+// TODO add multivector with quantization
 
 pub const KEYWORD_PAYLOAD_KEY: &str = "crasher-payload-keyword";
 
@@ -30,12 +38,14 @@ pub const KEYWORD_PAYLOAD_KEY: &str = "crasher-payload-keyword";
 pub struct TestNamedVectors {
     dense_vectors: HashMap<String, VectorParams>,
     sparse_vectors: HashMap<String, SparseVectorParams>,
+    multi_vectors: HashMap<String, VectorParams>,
 }
 
 impl TestNamedVectors {
     pub fn new(duplication_factor: usize, vec_dim: usize) -> Self {
         let mut sparse_vectors = HashMap::new();
         let mut dense_vectors = HashMap::new();
+        let mut multi_vectors = HashMap::new();
 
         let hnsw_config = Some(HnswConfigDiff {
             m: Some(32),
@@ -58,6 +68,7 @@ impl TestNamedVectors {
                     hnsw_config: hnsw_config.clone(),
                     on_disk: Some(true), // on disk
                     datatype: None,
+                    multivector_config: None,
                 },
             );
         }
@@ -74,6 +85,7 @@ impl TestNamedVectors {
                     hnsw_config: hnsw_config.clone(),
                     on_disk: Some(false), // rocksdb
                     datatype: None,
+                    multivector_config: None,
                 },
             );
         }
@@ -90,6 +102,7 @@ impl TestNamedVectors {
                     hnsw_config: hnsw_config.clone(),
                     on_disk: Some(true), // TODO could be flipped
                     datatype: Some(2),   // UInt8
+                    multivector_config: None,
                 },
             );
         }
@@ -106,6 +119,7 @@ impl TestNamedVectors {
                     hnsw_config: hnsw_config.clone(),
                     on_disk: Some(true), // TODO could be flipped
                     datatype: Some(3),   // Float16
+                    multivector_config: None,
                 },
             );
         }
@@ -128,6 +142,7 @@ impl TestNamedVectors {
                     hnsw_config: hnsw_config.clone(),
                     on_disk: Some(true), // TODO could be flipped
                     datatype: None,
+                    multivector_config: None,
                 },
             );
         }
@@ -149,6 +164,7 @@ impl TestNamedVectors {
                     hnsw_config: hnsw_config.clone(),
                     on_disk: Some(true), // TODO could be flipped
                     datatype: None,
+                    multivector_config: None,
                 },
             );
         }
@@ -169,6 +185,7 @@ impl TestNamedVectors {
                     hnsw_config: hnsw_config.clone(),
                     on_disk: Some(true), // TODO could be flipped
                     datatype: None,
+                    multivector_config: None,
                 },
             );
         }
@@ -203,9 +220,44 @@ impl TestNamedVectors {
             );
         }
 
+        // multi vector on disk
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", MULTI_VECTOR_NAME_ON_DISK, i);
+            multi_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(true), // on disk
+                    datatype: None,
+                    multivector_config: Some(MultiVectorConfig { comparator: 0 }),
+                },
+            );
+        }
+
+        // multi vector rocksdb
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", MULTI_VECTOR_NAME_ROCKSDB, i);
+            multi_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(false), // rocksdb
+                    datatype: None,
+                    multivector_config: Some(MultiVectorConfig { comparator: 0 }),
+                },
+            );
+        }
+
         Self {
             dense_vectors,
             sparse_vectors,
+            multi_vectors,
         }
     }
 
@@ -217,12 +269,20 @@ impl TestNamedVectors {
         self.dense_vectors.clone()
     }
 
+    pub fn multi_dense_vectors(&self) -> HashMap<String, VectorParams> {
+        self.multi_vectors.clone()
+    }
+
     pub fn sparse_vector_names(&self) -> Vec<String> {
         self.sparse_vectors.keys().cloned().collect()
     }
 
     pub fn dense_vector_names(&self) -> Vec<String> {
         self.dense_vectors.keys().cloned().collect()
+    }
+
+    pub fn multi_vector_names(&self) -> Vec<String> {
+        self.multi_vectors.keys().cloned().collect()
     }
 }
 

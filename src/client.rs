@@ -151,6 +151,7 @@ pub async fn search_batch_points(
 
     // dense search requests
     if !only_sparse {
+        // dense
         for dense_name in test_named_vectors.dense_vector_names() {
             let request = SearchPoints {
                 collection_name: collection_name.to_string(),
@@ -169,6 +170,10 @@ pub async fn search_batch_points(
                 sparse_indices: None,
             };
             requests.push(request);
+        }
+        // multi dense
+        for _dense_name in test_named_vectors.multi_vector_names() {
+            // TODO insert random multivectors
         }
     }
 
@@ -203,10 +208,19 @@ pub async fn create_collection(
     });
 
     let dense_vectors_config = if !args.only_sparse {
+        let mut all_dense_params = HashMap::new();
+
+        // dense vectors
         let dense_vector_params = test_named_vectors.dense_vectors();
+        all_dense_params.extend(dense_vector_params);
+
+        // multi dense vectors
+        let multi_dense_vector_params = test_named_vectors.multi_dense_vectors();
+        all_dense_params.extend(multi_dense_vector_params);
+
         Some(VectorsConfig {
             config: Some(ParamsMap(VectorParamsMap {
-                map: dense_vector_params,
+                map: all_dense_params,
             })),
         })
     } else {
@@ -288,8 +302,13 @@ pub async fn insert_points_batch(
             let mut vectors_map: HashMap<String, Vector> = HashMap::new();
 
             if !only_sparse_vectors {
+                // dense
                 for name in test_named_vectors.dense_vector_names() {
                     vectors_map.insert(name.clone(), random_dense_vector(vec_dim).into());
+                }
+                // multi dense
+                for _name in test_named_vectors.multi_vector_names() {
+                    // TODO insert random multivectors
                 }
             }
 
