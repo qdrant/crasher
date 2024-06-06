@@ -11,7 +11,7 @@ thiserror = "1.0.61"
 rand = "0.8.5"
 clap = { version = "4.5.4", features = ["derive"] }
 tokio = { version = "1.38.0", features = ["full"] }
-qdrant-client = "1.9.0"
+qdrant-client = { git = "https://github.com/qdrant/rust-client.git", branch = "regen-1.10" }
 ctrlc = "3.4.4"
 log = "0.4.21"
 env_logger = "0.11.3"

@@ -166,6 +166,7 @@ impl TestNamedVectors {
                         full_scan_threshold: None,
                         on_disk: Some(true), // on disk
                     }),
+                    modifier: None,
                 },
             );
         }
@@ -180,6 +181,7 @@ impl TestNamedVectors {
                         full_scan_threshold: None,
                         on_disk: Some(false), // in memory
                     }),
+                    modifier: None,
                 },
             );
         }
