@@ -257,7 +257,7 @@ pub async fn insert_points_batch(
     write_ordering: Option<WriteOrdering>,
     stopped: Arc<AtomicBool>,
 ) -> Result<(), CrasherError> {
-    let max_batch_size = 64;
+    let max_batch_size = 32;
     // handle less than batch & spill over
     let (batch_size, num_batches, last_batch_size) = if points_count <= max_batch_size {
         (points_count, 1, points_count)
