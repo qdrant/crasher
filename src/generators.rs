@@ -15,6 +15,7 @@ use std::collections::HashMap;
 pub const DENSE_VECTOR_NAME_ON_DISK: &str = "dense-vector-on-disk";
 pub const DENSE_VECTOR_NAME_ROCKSDB: &str = "dense-vector-rocksdb";
 pub const DENSE_VECTOR_NAME_UINT8: &str = "dense-vector-uint8";
+pub const DENSE_VECTOR_NAME_FLOAT16: &str = "dense-vector-float16";
 pub const DENSE_VECTOR_NAME_SQ: &str = "dense-vector-sq";
 pub const DENSE_VECTOR_NAME_PQ: &str = "dense-vector-pq";
 pub const DENSE_VECTOR_NAME_BQ: &str = "dense-vector-bq";
@@ -89,6 +90,22 @@ impl TestNamedVectors {
                     hnsw_config: hnsw_config.clone(),
                     on_disk: Some(true), // TODO could be flipped
                     datatype: Some(2),   // UInt8
+                },
+            );
+        }
+
+        // dense vectors float16
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", DENSE_VECTOR_NAME_FLOAT16, i);
+            dense_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(true), // TODO could be flipped
+                    datatype: Some(3),   // Float16
                 },
             );
         }
