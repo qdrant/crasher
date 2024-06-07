@@ -342,7 +342,7 @@ pub fn random_dense_vector(dim: usize) -> Vec<f32> {
 
 pub fn random_sparse_vector(max_size: usize, sparsity: f64) -> Vec<(u32, f32)> {
     let mut rng = rand::thread_rng();
-    let size = rng.gen_range(1..max_size);
+    let size = rng.gen_range(1..=max_size);
     // (index, value)
     let mut pairs = Vec::with_capacity(size);
     for i in 1..=size {
