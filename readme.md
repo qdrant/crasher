@@ -27,6 +27,8 @@ Options:
           Qdrant gRPC service URIs (can be used several times to specify several URIs) [default: http://localhost:6334]
       --points-count <POINTS_COUNT>
           Number of points to generate [default: 5000]
+      --vector-dimension <VECTOR_DIMENSION>
+          Dimension of generated vectors [default: 1024]
       --flush-interval-sec <FLUSH_INTERVAL_SEC>
           Configure the flush interval for collections [default: 5]
       --segment-count <SEGMENT_COUNT>

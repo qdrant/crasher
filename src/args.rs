@@ -22,6 +22,9 @@ pub struct Args {
     /// Number of points to generate
     #[arg(long, default_value_t = 5_000)]
     pub points_count: usize,
+    /// Dimension of generated vectors
+    #[arg(long, default_value_t = 1024)]
+    pub vector_dimension: usize,
     /// Configure the flush interval for collections
     #[arg(long, default_value_t = 5)]
     pub flush_interval_sec: usize,

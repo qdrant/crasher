@@ -59,8 +59,12 @@ async fn main() {
 
                     // workload task
                     let client_worker = client.clone();
-                    let workload =
-                        Workload::new(stopped.clone(), args.duplication_factor, args.points_count);
+                    let workload = Workload::new(
+                        stopped.clone(),
+                        args.duplication_factor,
+                        args.points_count,
+                        args.vector_dimension,
+                    );
                     let workload_task = tokio::spawn(async move {
                         workload.work(&client_worker, args.clone()).await;
                     });

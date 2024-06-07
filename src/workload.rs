@@ -29,9 +29,13 @@ pub struct Workload {
 }
 
 impl Workload {
-    pub fn new(stopped: Arc<AtomicBool>, duplication_factor: usize, points_count: usize) -> Self {
+    pub fn new(
+        stopped: Arc<AtomicBool>,
+        duplication_factor: usize,
+        points_count: usize,
+        vec_dim: usize,
+    ) -> Self {
         let collection_name = "workload-crasher".to_string();
-        let vec_dim = 1024;
         let payload_count = 1;
         let search_count = 1;
         let test_named_vectors = TestNamedVectors::new(duplication_factor, vec_dim);
