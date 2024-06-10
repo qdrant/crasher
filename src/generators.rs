@@ -30,8 +30,13 @@ pub const SPARSE_VECTOR_NAME_INDEX_MEMORY: &str = "sparse-vector-index-memory";
 /// Multi vectors base names
 pub const MULTI_VECTOR_NAME_ON_DISK: &str = "multi-dense-vector-on-disk";
 pub const MULTI_VECTOR_NAME_ROCKSDB: &str = "multi-dense-vector-rocksdb";
-// TODO add multivector with quantization
+pub const MULTI_VECTOR_NAME_UINT8: &str = "multi-dense-vector-uint8";
+pub const MULTI_VECTOR_NAME_FLOAT16: &str = "multi-dense-vector-float16";
+pub const MULTI_VECTOR_NAME_SQ: &str = "multi-dense-vector-sq";
+pub const MULTI_VECTOR_NAME_PQ: &str = "multi-dense-vector-pq";
+pub const MULTI_VECTOR_NAME_BQ: &str = "multi-dense-vector-bq";
 
+/// Payload keys
 pub const KEYWORD_PAYLOAD_KEY: &str = "crasher-payload-keyword";
 
 #[derive(Debug)]
@@ -41,6 +46,7 @@ pub struct TestNamedVectors {
     multi_vectors: HashMap<String, VectorParams>,
 }
 
+// TODO unit test names
 impl TestNamedVectors {
     pub fn new(duplication_factor: usize, vec_dim: usize) -> Self {
         let mut sparse_vectors = HashMap::new();
@@ -220,6 +226,7 @@ impl TestNamedVectors {
             );
         }
 
+        let multivector_config = Some(MultiVectorConfig { comparator: 0 });
         // multi vector on disk
         for i in 1..=duplication_factor {
             let name = format!("{}-{}", MULTI_VECTOR_NAME_ON_DISK, i);
@@ -232,7 +239,7 @@ impl TestNamedVectors {
                     hnsw_config: hnsw_config.clone(),
                     on_disk: Some(true), // on disk
                     datatype: None,
-                    multivector_config: Some(MultiVectorConfig { comparator: 0 }),
+                    multivector_config: multivector_config.clone(),
                 },
             );
         }
@@ -249,7 +256,107 @@ impl TestNamedVectors {
                     hnsw_config: hnsw_config.clone(),
                     on_disk: Some(false), // rocksdb
                     datatype: None,
-                    multivector_config: Some(MultiVectorConfig { comparator: 0 }),
+                    multivector_config: multivector_config.clone(),
+                },
+            );
+        }
+
+        // multi vector uint8
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", MULTI_VECTOR_NAME_UINT8, i);
+            multi_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(false), // rocksdb
+                    datatype: Some(2),    // UInt8
+                    multivector_config: multivector_config.clone(),
+                },
+            );
+        }
+
+        // multi vector float16
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", MULTI_VECTOR_NAME_FLOAT16, i);
+            multi_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(false), // rocksdb
+                    datatype: Some(3),    // Float16
+                    multivector_config: multivector_config.clone(),
+                },
+            );
+        }
+
+        // multi vectors SQ
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", MULTI_VECTOR_NAME_SQ, i);
+            multi_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Scalar(ScalarQuantization {
+                            r#type: 1, // Int8
+                            quantile: None,
+                            always_ram: Some(false),
+                        })),
+                    }),
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(true), // TODO could be flipped
+                    datatype: None,
+                    multivector_config: multivector_config.clone(),
+                },
+            );
+        }
+
+        // multi vectors PQ
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", MULTI_VECTOR_NAME_PQ, i);
+            multi_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Product(ProductQuantization {
+                            compression: 1, // x8
+                            always_ram: Some(false),
+                        })),
+                    }),
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(true), // TODO could be flipped
+                    datatype: None,
+                    multivector_config: multivector_config.clone(),
+                },
+            );
+        }
+
+        // multi vectors BQ
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", MULTI_VECTOR_NAME_BQ, i);
+            multi_vectors.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Binary(BinaryQuantization {
+                            always_ram: Some(false),
+                        })),
+                    }),
+                    hnsw_config: hnsw_config.clone(),
+                    on_disk: Some(true), // TODO could be flipped
+                    datatype: None,
+                    multivector_config: multivector_config.clone(),
                 },
             );
         }
