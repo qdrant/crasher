@@ -50,7 +50,7 @@ pub struct Args {
     #[arg(long, default_value_t = false)]
     pub only_sparse: bool,
     /// Duplication factor for generating additional named vectors
-    #[arg(long, default_value_t = 3)]
+    #[arg(long, default_value_t = 2)]
     pub duplication_factor: usize,
     /// Whether to perform extra consistency check
     #[arg(long, default_value_t = false)]

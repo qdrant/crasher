@@ -172,8 +172,25 @@ pub async fn search_batch_points(
             requests.push(request);
         }
         // multi dense
-        for _dense_name in test_named_vectors.multi_vector_names() {
-            // TODO insert random multivectors
+        for multi_dense_name in test_named_vectors.multi_vector_names() {
+            // TODO insert random multivectors when supported (relying on expansion dense for now)
+            let request = SearchPoints {
+                collection_name: collection_name.to_string(),
+                vector: random_dense_vector(vec_dim),
+                vector_name: Some(multi_dense_name.clone()),
+                filter: request_filter.clone(),
+                limit: 100,
+                with_payload: Some(true.into()),
+                params: None,
+                score_threshold: None,
+                offset: None,
+                with_vectors: None,
+                read_consistency: None,
+                timeout: None,
+                shard_key_selector: None,
+                sparse_indices: None,
+            };
+            requests.push(request);
         }
     }
 
@@ -307,8 +324,9 @@ pub async fn insert_points_batch(
                     vectors_map.insert(name.clone(), random_dense_vector(vec_dim).into());
                 }
                 // multi dense
-                for _name in test_named_vectors.multi_vector_names() {
-                    // TODO insert random multivectors
+                for name in test_named_vectors.multi_vector_names() {
+                    // TODO insert random multivectors when supported (relying on expansion dense for now)
+                    vectors_map.insert(name.clone(), random_dense_vector(vec_dim).into());
                 }
             }
 
