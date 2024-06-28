@@ -5,16 +5,16 @@ use crate::generators::{
     random_dense_vector, random_filter, random_payload, random_sparse_vector, TestNamedVectors,
 };
 use anyhow::Context;
-use qdrant_client::client::QdrantClient;
 use qdrant_client::qdrant::point_id::PointIdOptions;
-use qdrant_client::qdrant::points_selector::PointsSelectorOneOf;
 use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
 use qdrant_client::qdrant::{
-    CollectionInfo, CountPoints, CreateCollection, FieldType, GetResponse, OptimizersConfigDiff,
-    PointId, PointStruct, PointsIdsList, PointsSelector, SearchBatchPoints, SearchBatchResponse,
-    SearchPoints, SparseIndices, SparseVectorConfig, Vector, VectorParamsMap, Vectors,
-    VectorsConfig, WithPayloadSelector, WithVectorsSelector, WriteOrdering,
+    CollectionInfo, CountPointsBuilder, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder,
+    DeletePointsBuilder, FieldType, GetPointsBuilder, GetResponse, OptimizersConfigDiff, PointId,
+    PointStruct, SearchBatchPointsBuilder, SearchBatchResponse, SearchPoints,
+    SetPayloadPointsBuilder, SparseIndices, SparseVectorConfig, UpsertPointsBuilder, Vector,
+    VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
+use qdrant_client::Qdrant;
 use rand::Rng;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,7 +24,7 @@ use tokio::time::sleep;
 
 /// Wait for collection to be indexed
 pub async fn wait_server_ready(
-    client: &QdrantClient,
+    client: &Qdrant,
     stopped: Arc<AtomicBool>,
 ) -> Result<f64, CrasherError> {
     let start = std::time::Instant::now();
@@ -52,7 +52,7 @@ pub async fn wait_server_ready(
 
 /// Get points count
 pub async fn get_collection_info(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
 ) -> Result<CollectionInfo, anyhow::Error> {
     let collection_info = client
@@ -70,7 +70,7 @@ pub async fn get_collection_info(
 /// Get points count from collection info
 #[allow(dead_code)]
 pub async fn get_info_points_count(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
 ) -> Result<usize, anyhow::Error> {
     let point_count = client
@@ -88,18 +88,11 @@ pub async fn get_info_points_count(
 
 /// Get points count
 pub async fn get_points_count(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
 ) -> Result<usize, anyhow::Error> {
-    let count_req = CountPoints {
-        collection_name: collection_name.to_string(),
-        filter: None,
-        exact: Some(true),
-        read_consistency: None,
-        shard_key_selector: None,
-    };
     let point_count = client
-        .count(&count_req)
+        .count(CountPointsBuilder::new(collection_name).exact(true))
         .await
         .context(format!(
             "Failed to run points count for {}",
@@ -113,7 +106,7 @@ pub async fn get_points_count(
 
 /// Search points
 pub async fn search_batch_points(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     test_named_vectors: &TestNamedVectors,
     only_sparse: bool,
@@ -195,15 +188,8 @@ pub async fn search_batch_points(
         }
     }
 
-    let search_batch_points = SearchBatchPoints {
-        collection_name: collection_name.to_string(),
-        search_points: requests,
-        read_consistency: None,
-        timeout: None,
-    };
-
     let response = client
-        .search_batch_points(&search_batch_points)
+        .search_batch_points(SearchBatchPointsBuilder::new(collection_name, requests))
         .await
         .context(format!(
             "Failed to search batch points on {}",
@@ -215,15 +201,15 @@ pub async fn search_batch_points(
 
 /// Create collection
 pub async fn create_collection(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     test_named_vectors: &TestNamedVectors,
     args: Arc<Args>,
 ) -> Result<(), anyhow::Error> {
     let sparse_vector_params = test_named_vectors.sparse_vectors();
-    let sparse_vectors_config = Some(SparseVectorConfig {
+    let sparse_vectors_config = SparseVectorConfig {
         map: sparse_vector_params,
-    });
+    };
 
     let dense_vectors_config = if !args.only_sparse {
         let mut all_dense_params = HashMap::new();
@@ -245,32 +231,27 @@ pub async fn create_collection(
         None
     };
 
-    client
-        .create_collection(&CreateCollection {
-            collection_name: collection_name.to_string(),
-            hnsw_config: None,
-            vectors_config: dense_vectors_config,
-            sparse_vectors_config,
-            replication_factor: Some(args.replication_factor as u32),
-            write_consistency_factor: Some(args.write_consistency_factor as u32),
-            init_from_collection: None,
-            quantization_config: None,
-            optimizers_config: Some(OptimizersConfigDiff {
-                deleted_threshold: None,
-                vacuum_min_vector_number: None,
-                default_segment_number: Some(args.segment_count as u64), // to force constant merges
-                indexing_threshold: args.indexing_threshold.map(|i| i as u64),
-                flush_interval_sec: Some(args.flush_interval_sec as u64),
-                memmap_threshold: args.memmap_threshold.map(|i| i as u64),
-                max_segment_size: None,
-                max_optimization_threads: None,
-            }),
-            shard_number: None,
-            on_disk_payload: Some(false), // a bit faster
-            wal_config: None,
-            timeout: None,
-            sharding_method: None,
+    let mut request = CreateCollectionBuilder::new(collection_name)
+        .sparse_vectors_config(sparse_vectors_config)
+        .replication_factor(args.replication_factor as u32)
+        .write_consistency_factor(args.write_consistency_factor as u32)
+        .optimizers_config(OptimizersConfigDiff {
+            deleted_threshold: None,
+            vacuum_min_vector_number: None,
+            default_segment_number: Some(args.segment_count as u64), // to force constant merges
+            indexing_threshold: args.indexing_threshold.map(|i| i as u64),
+            flush_interval_sec: Some(args.flush_interval_sec as u64),
+            memmap_threshold: args.memmap_threshold.map(|i| i as u64),
+            max_segment_size: None,
+            max_optimization_threads: None,
         })
+        .on_disk_payload(false);
+    if let Some(dense_vectors_config) = dense_vectors_config {
+        request = request.vectors_config(dense_vectors_config);
+    }
+
+    client
+        .create_collection(request)
         .await
         .context(format!("Failed to create collection {}", collection_name))?;
     Ok(())
@@ -279,7 +260,7 @@ pub async fn create_collection(
 /// insert points into collection (blocking)
 #[allow(clippy::too_many_arguments)]
 pub async fn insert_points_batch(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     points_count: usize,
     vec_dim: usize,
@@ -354,54 +335,42 @@ pub async fn insert_points_batch(
             return Err(Cancelled);
         }
 
-        if wait {
-            // push batch blocking
-            client
-                .upsert_points_blocking(collection_name, None, points, write_ordering.clone())
-                .await
-                .context(format!(
-                    "Failed to block insert {} points (batch {}/{}) into {}",
-                    batch_size, batch_id, num_batches, collection_name
-                ))?;
-        } else {
-            // push batch non-blocking
-            client
-                .upsert_points(collection_name, None, points, write_ordering.clone())
-                .await
-                .context(format!(
-                    "Failed to insert {} points (batch {}/{}) into {}",
-                    batch_size, batch_id, num_batches, collection_name
-                ))?;
-        }
+        client
+            .upsert_points(
+                UpsertPointsBuilder::new(collection_name, points)
+                    .ordering(write_ordering.clone().unwrap_or_default())
+                    .wait(wait),
+            )
+            .await
+            .context(format!(
+                "Failed to insert {} points (batch {}/{}) into {}",
+                batch_size, batch_id, num_batches, collection_name
+            ))?;
     }
     Ok(())
 }
 
 pub async fn create_field_index(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     field_name: &str,
     field_type: FieldType,
 ) -> Result<(), anyhow::Error> {
     client
-        .create_field_index_blocking(
-            collection_name.to_string(),
-            field_name.to_string(),
-            field_type,
-            None,
-            None,
+        .create_field_index(
+            CreateFieldIndexCollectionBuilder::new(collection_name, field_name, field_type)
+                .wait(true),
         )
         .await
         .context(format!(
-            "Failed to create field index {} for collection {}",
-            field_name, collection_name
+            "Failed to create field index {field_name} for collection {collection_name}",
         ))?;
     Ok(())
 }
 
 /// Set payload (blocking)
 pub async fn set_payload(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     point_id: u64,
     payload_count: usize,
@@ -413,20 +382,12 @@ pub async fn set_payload(
         point_id_options: Some(PointIdOptions::Num(point_id)),
     }];
 
-    let points_selector = &PointsSelector {
-        points_selector_one_of: Some(PointsSelectorOneOf::Points(PointsIdsList {
-            ids: points_id_selector,
-        })),
-    };
-
     let resp = client
-        .set_payload_blocking(
-            collection_name,
-            None,
-            points_selector,
-            payload,
-            None,
-            write_ordering,
+        .set_payload(
+            SetPayloadPointsBuilder::new(collection_name, payload)
+                .points_selector(points_id_selector)
+                .ordering(write_ordering.unwrap_or_default())
+                .wait(true),
         )
         .await
         .context(format!(
@@ -447,24 +408,21 @@ pub async fn set_payload(
 
 /// Retrieve points
 pub async fn retrieve_points(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     ids: &[usize],
 ) -> Result<GetResponse, anyhow::Error> {
-    // type inference issues forces to ascribe the types :shrug:
-    let with_vectors: Option<WithVectorsSelector> = Some(true.into());
-    let with_payload: Option<WithPayloadSelector> = Some(true.into());
     let response = client
         .get_points(
-            collection_name,
-            None,
-            ids.iter()
-                .map(|id| (*id as u64).into())
-                .collect::<Vec<_>>()
-                .as_slice(),
-            with_vectors,
-            with_payload,
-            None,
+            GetPointsBuilder::new(
+                collection_name,
+                ids.iter()
+                    .map(|id| (*id as u64).into())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .with_vectors(true)
+            .with_payload(true),
         )
         .await
         .context(format!("Failed to retrieve points on {}", collection_name))?;
@@ -474,7 +432,7 @@ pub async fn retrieve_points(
 
 /// delete points (blocking)
 pub async fn delete_points(
-    client: &QdrantClient,
+    client: &Qdrant,
     collection_name: &str,
     points_count: usize,
 ) -> Result<(), anyhow::Error> {
@@ -482,19 +440,14 @@ pub async fn delete_points(
         .map(|id| PointId {
             point_id_options: Some(PointIdOptions::Num(id)),
         })
-        .collect();
+        .collect::<Vec<_>>();
 
     // delete all points
     let resp = client
-        .delete_points_blocking(
-            collection_name,
-            None,
-            &PointsSelector {
-                points_selector_one_of: Some(PointsSelectorOneOf::Points(PointsIdsList {
-                    ids: points_selector,
-                })),
-            },
-            None,
+        .delete_points(
+            DeletePointsBuilder::new(collection_name)
+                .points(points_selector)
+                .wait(true),
         )
         .await
         .context(format!(

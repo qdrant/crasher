@@ -17,3 +17,9 @@ impl From<anyhow::Error> for CrasherError {
         CrasherError::Client(e)
     }
 }
+
+impl From<qdrant_client::QdrantError> for CrasherError {
+    fn from(e: qdrant_client::QdrantError) -> Self {
+        anyhow::anyhow!(e).into()
+    }
+}

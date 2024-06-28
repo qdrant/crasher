@@ -1,8 +1,8 @@
 use anyhow::Result;
-use qdrant_client::client::QdrantClient;
 use qdrant_client::prelude::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors::VectorsOptions;
 use qdrant_client::qdrant::{FieldType, WriteOrdering};
+use qdrant_client::Qdrant;
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -54,7 +54,7 @@ impl Workload {
 }
 
 impl Workload {
-    pub async fn work(&self, client: &QdrantClient, args: Arc<Args>) {
+    pub async fn work(&self, client: &Qdrant, args: Arc<Args>) {
         loop {
             if self.stopped.clone().load(Ordering::Relaxed) {
                 break;
@@ -95,7 +95,7 @@ impl Workload {
         }
     }
 
-    pub async fn run(&self, client: &QdrantClient, args: Arc<Args>) -> Result<(), CrasherError> {
+    pub async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CrasherError> {
         log::info!("Starting workload...");
         // create and populate collection if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
@@ -196,7 +196,7 @@ impl Workload {
     /// Consistency checker for id range
     async fn consistency_check(
         &self,
-        client: &QdrantClient,
+        client: &Qdrant,
         points_count: usize,
     ) -> Result<(), CrasherError> {
         // fetch all existing points (rely on numeric ids!)

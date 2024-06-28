@@ -1,5 +1,5 @@
 use crate::client::wait_server_ready;
-use qdrant_client::client::QdrantClient;
+use qdrant_client::Qdrant;
 use rand::Rng;
 use std::process::exit;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -41,7 +41,7 @@ impl ProcessManager {
     pub async fn chaos(
         &mut self,
         stopped: Arc<AtomicBool>,
-        client: &QdrantClient,
+        client: &Qdrant,
         crash_probability: f64,
         sleep_duration_between_crash_sec: usize,
     ) {
