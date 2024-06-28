@@ -10,8 +10,8 @@ use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
 use qdrant_client::qdrant::{
     CollectionInfo, CountPointsBuilder, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder,
     DeletePointsBuilder, FieldType, GetPointsBuilder, GetResponse, OptimizersConfigDiff, PointId,
-    PointStruct, SearchBatchPointsBuilder, SearchBatchResponse, SearchPoints,
-    SetPayloadPointsBuilder, SparseIndices, SparseVectorConfig, UpsertPointsBuilder, Vector,
+    PointStruct, Query, QueryBatchPointsBuilder, QueryBatchResponse, QueryPoints,
+    SetPayloadPointsBuilder, SparseVectorConfig, UpsertPointsBuilder, Vector, VectorInput,
     VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
 use qdrant_client::Qdrant;
@@ -104,15 +104,15 @@ pub async fn get_points_count(
     Ok(point_count as usize)
 }
 
-/// Search points
-pub async fn search_batch_points(
+/// Query points
+pub async fn query_batch_points(
     client: &Qdrant,
     collection_name: &str,
     test_named_vectors: &TestNamedVectors,
     only_sparse: bool,
     vec_dim: usize,
     payload_count: usize,
-) -> Result<SearchBatchResponse, anyhow::Error> {
+) -> Result<QueryBatchResponse, anyhow::Error> {
     let request_filter = random_filter(Some(payload_count));
     let mut requests = vec![];
 
@@ -120,16 +120,17 @@ pub async fn search_batch_points(
     for sparse_name in test_named_vectors.sparse_vector_names() {
         let sparse_vector = random_sparse_vector(vec_dim, 0.1);
         // split values & indices
-        let data: Vec<_> = sparse_vector.iter().map(|(idx, _)| *idx).collect();
-        let sparse_indices = Some(SparseIndices { data });
-        let sparse_values = sparse_vector.iter().map(|(_, val)| *val).collect();
-
-        let request = SearchPoints {
+        let sparse_indices: Vec<_> = sparse_vector.iter().map(|(idx, _)| *idx).collect();
+        let sparse_values: Vec<_> = sparse_vector.iter().map(|(_, val)| *val).collect();
+        let query_vector = VectorInput::new_sparse(sparse_indices, sparse_values);
+        let query_nearest = Query::new_nearest(query_vector);
+        let request = QueryPoints {
             collection_name: collection_name.to_string(),
-            vector: sparse_values,
-            vector_name: Some(sparse_name),
+            prefetch: vec![],
+            query: Some(query_nearest),
+            using: Some(sparse_name),
             filter: request_filter.clone(),
-            limit: 100,
+            limit: Some(100),
             with_payload: Some(true.into()),
             params: None,
             score_threshold: None,
@@ -138,7 +139,7 @@ pub async fn search_batch_points(
             read_consistency: None,
             timeout: None,
             shard_key_selector: None,
-            sparse_indices,
+            lookup_from: None,
         };
         requests.push(request);
     }
@@ -147,12 +148,15 @@ pub async fn search_batch_points(
     if !only_sparse {
         // dense
         for dense_name in test_named_vectors.dense_vector_names() {
-            let request = SearchPoints {
+            let query_vector = VectorInput::new_dense(random_dense_vector(vec_dim));
+            let query_nearest = Query::new_nearest(query_vector);
+            let request = QueryPoints {
                 collection_name: collection_name.to_string(),
-                vector: random_dense_vector(vec_dim),
-                vector_name: Some(dense_name.clone()),
+                prefetch: vec![],
+                query: Some(query_nearest),
+                using: Some(dense_name.clone()),
                 filter: request_filter.clone(),
-                limit: 100,
+                limit: Some(100),
                 with_payload: Some(true.into()),
                 params: None,
                 score_threshold: None,
@@ -161,19 +165,25 @@ pub async fn search_batch_points(
                 read_consistency: None,
                 timeout: None,
                 shard_key_selector: None,
-                sparse_indices: None,
+                lookup_from: None,
             };
             requests.push(request);
         }
         // multi dense
         for multi_dense_name in test_named_vectors.multi_vector_names() {
-            // TODO search with real multivectors when supported (relying on expansion dense for now)
-            let request = SearchPoints {
+            let vec_count = rand::thread_rng().gen_range(1..5);
+            let multi_vector: Vec<_> = (0..vec_count)
+                .map(|_| random_dense_vector(vec_dim))
+                .collect();
+            let query_vector = VectorInput::new_multi(multi_vector);
+            let query_nearest = Query::new_nearest(query_vector);
+            let request = QueryPoints {
                 collection_name: collection_name.to_string(),
-                vector: random_dense_vector(vec_dim),
-                vector_name: Some(multi_dense_name.clone()),
+                prefetch: vec![],
+                query: Some(query_nearest),
+                using: Some(multi_dense_name.clone()),
                 filter: request_filter.clone(),
-                limit: 100,
+                limit: Some(100),
                 with_payload: Some(true.into()),
                 params: None,
                 score_threshold: None,
@@ -182,17 +192,17 @@ pub async fn search_batch_points(
                 read_consistency: None,
                 timeout: None,
                 shard_key_selector: None,
-                sparse_indices: None,
+                lookup_from: None,
             };
             requests.push(request);
         }
     }
 
     let response = client
-        .search_batch_points(SearchBatchPointsBuilder::new(collection_name, requests))
+        .query_batch(QueryBatchPointsBuilder::new(collection_name, requests))
         .await
         .context(format!(
-            "Failed to search batch points on {}",
+            "Failed to query batch points on {}",
             collection_name
         ))?;
 

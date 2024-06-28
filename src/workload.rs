@@ -11,7 +11,7 @@ use tokio::time::sleep;
 use crate::args::Args;
 use crate::client::{
     create_collection, create_field_index, delete_points, get_collection_info, get_points_count,
-    insert_points_batch, retrieve_points, search_batch_points, set_payload,
+    insert_points_batch, query_batch_points, retrieve_points, set_payload,
 };
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
@@ -173,12 +173,12 @@ impl Workload {
             .await?;
         }
 
-        log::info!("Run: post search random vector");
+        log::info!("Run: query random vectors");
         for _i in 0..self.search_count {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
             }
-            search_batch_points(
+            query_batch_points(
                 client,
                 &self.collection_name,
                 &self.test_named_vectors,
