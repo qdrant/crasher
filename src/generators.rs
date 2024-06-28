@@ -106,7 +106,7 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true), // TODO could be flipped
+                    on_disk: Some(true), // on disk
                     datatype: Some(2),   // UInt8
                     multivector_config: None,
                 },
@@ -123,7 +123,7 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true), // TODO could be flipped
+                    on_disk: Some(true), // on disk
                     datatype: Some(3),   // Float16
                     multivector_config: None,
                 },
@@ -146,7 +146,7 @@ impl TestNamedVectors {
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true), // TODO could be flipped
+                    on_disk: Some(true), // on disk
                     datatype: None,
                     multivector_config: None,
                 },
@@ -168,7 +168,7 @@ impl TestNamedVectors {
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true), // TODO could be flipped
+                    on_disk: Some(true), // on disk
                     datatype: None,
                     multivector_config: None,
                 },
@@ -189,7 +189,7 @@ impl TestNamedVectors {
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true), // TODO could be flipped
+                    on_disk: Some(true), // on disk
                     datatype: None,
                     multivector_config: None,
                 },
@@ -273,8 +273,8 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(false), // rocksdb
-                    datatype: Some(2),    // UInt8
+                    on_disk: Some(true), // on disk
+                    datatype: Some(2),   // UInt8
                     multivector_config: multivector_config.clone(),
                 },
             );
@@ -290,8 +290,8 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(false), // rocksdb
-                    datatype: Some(3),    // Float16
+                    on_disk: Some(true), // on disk
+                    datatype: Some(3),   // Float16
                     multivector_config: multivector_config.clone(),
                 },
             );
@@ -313,7 +313,7 @@ impl TestNamedVectors {
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true), // TODO could be flipped
+                    on_disk: Some(true), // on disk
                     datatype: None,
                     multivector_config: multivector_config.clone(),
                 },
@@ -335,7 +335,7 @@ impl TestNamedVectors {
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true), // TODO could be flipped
+                    on_disk: Some(true), // on disk
                     datatype: None,
                     multivector_config: multivector_config.clone(),
                 },
@@ -356,7 +356,7 @@ impl TestNamedVectors {
                         })),
                     }),
                     hnsw_config: hnsw_config.clone(),
-                    on_disk: Some(true), // TODO could be flipped
+                    on_disk: Some(true), // on disk
                     datatype: None,
                     multivector_config: multivector_config.clone(),
                 },
