@@ -205,6 +205,7 @@ impl TestNamedVectors {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
                         on_disk: Some(true), // on disk
+                        datatype: None,
                     }),
                     modifier: None,
                 },
@@ -220,6 +221,7 @@ impl TestNamedVectors {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
                         on_disk: Some(false), // in memory
+                        datatype: None,
                     }),
                     modifier: None,
                 },
