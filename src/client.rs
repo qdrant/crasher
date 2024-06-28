@@ -15,6 +15,7 @@ use qdrant_client::qdrant::{
     SearchPoints, SparseIndices, SparseVectorConfig, Vector, VectorParamsMap, Vectors,
     VectorsConfig, WithPayloadSelector, WithVectorsSelector, WriteOrdering,
 };
+use rand::Rng;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -173,7 +174,7 @@ pub async fn search_batch_points(
         }
         // multi dense
         for multi_dense_name in test_named_vectors.multi_vector_names() {
-            // TODO insert random multivectors when supported (relying on expansion dense for now)
+            // TODO search with real multivectors when supported (relying on expansion dense for now)
             let request = SearchPoints {
                 collection_name: collection_name.to_string(),
                 vector: random_dense_vector(vec_dim),
@@ -321,12 +322,18 @@ pub async fn insert_points_batch(
             if !only_sparse_vectors {
                 // dense
                 for name in test_named_vectors.dense_vector_names() {
-                    vectors_map.insert(name.clone(), random_dense_vector(vec_dim).into());
+                    vectors_map.insert(
+                        name.clone(),
+                        Vector::new_dense(random_dense_vector(vec_dim)),
+                    );
                 }
                 // multi dense
                 for name in test_named_vectors.multi_vector_names() {
-                    // TODO insert random multivectors when supported (relying on expansion dense for now)
-                    vectors_map.insert(name.clone(), random_dense_vector(vec_dim).into());
+                    let vec_count = rand::thread_rng().gen_range(1..5);
+                    let multi_vector = (0..vec_count)
+                        .map(|_| random_dense_vector(vec_dim))
+                        .collect();
+                    vectors_map.insert(name.clone(), Vector::new_multi(multi_vector));
                 }
             }
 
