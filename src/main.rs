@@ -11,7 +11,7 @@ use crate::process::ProcessManager;
 use crate::workload::Workload;
 use clap::Parser;
 use env_logger::Target;
-use qdrant_client::client::{QdrantClient, QdrantClientConfig};
+use qdrant_client::{config::QdrantConfig, Qdrant};
 use std::process::exit;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -33,7 +33,7 @@ async fn main() {
     .expect("Error setting Ctrl-C handler");
 
     let client_config = get_config(args.uris.first().unwrap(), args.grpc_timeout_ms);
-    let client = QdrantClient::new(Some(client_config)).unwrap();
+    let client = Qdrant::new(client_config).unwrap();
     let client = Arc::new(client).clone();
     let args = Arc::new(args);
     let crash_probability = args.crash_probability;
@@ -96,11 +96,10 @@ async fn main() {
     }
 }
 
-fn get_config(url: &str, timeout_ms: usize) -> QdrantClientConfig {
-    let mut config = QdrantClientConfig::from_url(url);
-    config.timeout = Duration::from_millis(timeout_ms as u64);
-    config.connect_timeout = Duration::from_millis(timeout_ms as u64);
-    config
+fn get_config(url: &str, timeout_ms: usize) -> QdrantConfig {
+    Qdrant::from_url(url)
+        .timeout(Duration::from_millis(timeout_ms as u64))
+        .connect_timeout(Duration::from_millis(timeout_ms as u64))
 }
 
 pub fn setup_logger() {
