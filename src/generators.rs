@@ -26,6 +26,8 @@ pub const DENSE_VECTOR_NAME_BQ: &str = "dense-vector-bq";
 /// Sparse vectors base names
 pub const SPARSE_VECTOR_NAME_INDEX_DISK: &str = "sparse-vector-index-disk";
 pub const SPARSE_VECTOR_NAME_INDEX_MEMORY: &str = "sparse-vector-index-memory";
+pub const SPARSE_VECTOR_NAME_UINT8: &str = "sparse-vector-uint8";
+pub const SPARSE_VECTOR_NAME_FLOAT16: &str = "sparse-vector-float16";
 
 /// Multi vectors base names
 pub const MULTI_VECTOR_NAME_ON_DISK: &str = "multi-dense-vector-on-disk";
@@ -222,6 +224,38 @@ impl TestNamedVectors {
                         full_scan_threshold: None,
                         on_disk: Some(false), // in memory
                         datatype: None,
+                    }),
+                    modifier: None,
+                },
+            );
+        }
+
+        // sparse vector uint8
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", SPARSE_VECTOR_NAME_UINT8, i);
+            sparse_vectors.insert(
+                name.clone(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(true), // on disk
+                        datatype: Some(2),   // UInt8
+                    }),
+                    modifier: None,
+                },
+            );
+        }
+
+        // sparse vector float16
+        for i in 1..=duplication_factor {
+            let name = format!("{}-{}", SPARSE_VECTOR_NAME_FLOAT16, i);
+            sparse_vectors.insert(
+                name.clone(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(true), // on disk
+                        datatype: Some(3),   // Float16
                     }),
                     modifier: None,
                 },
