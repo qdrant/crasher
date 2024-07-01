@@ -134,11 +134,13 @@ impl Workload {
             if args.consistency_check {
                 // can be disabled if qdrant is running internal data consistency check on the server side
                 // `cargo run --features data-consistency-check`
-                log::info!("Run: pre consistency check ({})", current_count);
-                self.consistency_check(client, current_count).await?;
+                log::info!("Run: pre vector data consistency check ({})", current_count);
+                self.vector_data_consistency_check(client, current_count)
+                    .await?;
             }
 
             if args.missing_payload_check {
+                log::info!("Run: pre payload data consistency check");
                 self.missing_payload_check(client).await?;
             }
 
@@ -209,8 +211,8 @@ impl Workload {
         Ok(())
     }
 
-    /// Consistency checker for id range
-    async fn consistency_check(
+    /// Vector data consistency checker for id range
+    async fn vector_data_consistency_check(
         &self,
         client: &Qdrant,
         points_count: usize,
@@ -284,7 +286,7 @@ impl Workload {
         Ok(())
     }
 
-    async fn missing_payload_check(&self, client: &Qdrant) -> anyhow::Result<()> {
+    async fn missing_payload_check(&self, client: &Qdrant) -> Result<(), CrasherError> {
         let resp = client
             .scroll(
                 ScrollPointsBuilder::new(&self.collection_name)
@@ -295,9 +297,9 @@ impl Workload {
         let points: Vec<_> = resp.result.into_iter().map(|point| point.id).collect();
 
         if !points.is_empty() {
-            return Err(anyhow::format_err!(
+            return Err(Invariant(format!(
                 "Points {points:?} are missing timestamp payload!"
-            ));
+            )));
         }
 
         Ok(())
