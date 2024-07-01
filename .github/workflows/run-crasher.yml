@@ -12,8 +12,8 @@ on:
         description: "Version of qdrant to checkout (tags/v1.6.1, <commit-id>, my-branch)"
         default: dev
       crashing_time:
-        description: "Duration in seconds, default is 2400s (40 min) "
-        default: 2400
+        description: "Duration in seconds, default is 3600s (60 min) "
+        default: 3600
 
 env:
   CARGO_TERM_COLOR: always
@@ -32,7 +32,7 @@ jobs:
           
           crashing_time="${{ inputs.crashing_time }}"
           if [ -z "$crashing_time" ]; then
-            crashing_time="2400"
+            crashing_time="3600"
           fi          
           
           echo "qdrant_version=${qdrant_version}" >> $GITHUB_OUTPUT
