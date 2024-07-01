@@ -230,7 +230,7 @@ impl Workload {
                 for point in &response.result {
                     let point_id = point.id.as_ref().expect("Point id should be present");
                     if let Some(vectors) = &point.vectors {
-                        for vector in &vectors.vectors_options {
+                        if let Some(vector) = &vectors.vectors_options {
                             match vector {
                                 VectorsOptions::Vector(anonymous) => {
                                     return Err(Invariant(format!(

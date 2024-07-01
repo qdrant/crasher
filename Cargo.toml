@@ -9,7 +9,7 @@ edition = "2021"
 anyhow = "1.0.86"
 thiserror = "1.0.61"
 rand = "0.8.5"
-clap = { version = "4.5.7", features = ["derive"] }
+clap = { version = "4.5.8", features = ["derive"] }
 tokio = { version = "1.38.0", features = ["full"] }
 qdrant-client = { git = "https://github.com/qdrant/rust-client.git", branch = "dev" }
 ctrlc = "3.4.4"
