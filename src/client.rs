@@ -275,6 +275,7 @@ pub async fn insert_points_batch(
     points_count: usize,
     vec_dim: usize,
     payload_count: usize,
+    timestamp_payload: bool,
     only_sparse_vectors: bool,
     test_named_vectors: &TestNamedVectors,
     write_ordering: Option<WriteOrdering>,
@@ -335,11 +336,16 @@ pub async fn insert_points_batch(
 
             let vectors: Vectors = vectors_map.into();
 
-            points.push(PointStruct::new(
-                point_id,
-                vectors,
-                random_payload(Some(payload_count)),
-            ));
+            let mut payload = random_payload(Some(payload_count));
+
+            if timestamp_payload {
+                payload.insert(
+                    "timestamp",
+                    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+                );
+            }
+
+            points.push(PointStruct::new(point_id, vectors, payload));
         }
         if stopped.load(Ordering::Relaxed) {
             return Err(Cancelled);
