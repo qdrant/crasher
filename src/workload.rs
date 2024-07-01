@@ -1,7 +1,7 @@
 use anyhow::Result;
 use qdrant_client::prelude::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors::VectorsOptions;
-use qdrant_client::qdrant::{FieldType, WriteOrdering};
+use qdrant_client::qdrant::{Condition, FieldType, Filter, ScrollPointsBuilder, WriteOrdering};
 use qdrant_client::Qdrant;
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -114,6 +114,17 @@ impl Workload {
                 FieldType::Keyword,
             )
             .await?;
+
+            if args.missing_payload_check {
+                create_field_index(
+                    client,
+                    &self.collection_name,
+                    "timestamp",
+                    FieldType::Datetime,
+                )
+                .await?;
+            }
+
             let collection_info = get_collection_info(client, &self.collection_name).await?;
             log::info!("Collection info: {:#?}", collection_info);
         }
@@ -127,6 +138,10 @@ impl Workload {
                 self.consistency_check(client, current_count).await?;
             }
 
+            if args.missing_payload_check {
+                self.missing_payload_check(client).await?;
+            }
+
             log::info!("Run: delete existing points ({})", current_count);
             delete_points(client, &self.collection_name, current_count).await?;
         }
@@ -137,7 +152,8 @@ impl Workload {
             &self.collection_name,
             self.points_count,
             self.vec_dim,
-            0, // no payload at first
+            0,                          // no payload at first
+            args.missing_payload_check, // add timestamp payload for the missing payload check
             args.only_sparse,
             &self.test_named_vectors,
             None,
@@ -265,6 +281,25 @@ impl Workload {
                 }
             }
         }
+        Ok(())
+    }
+
+    async fn missing_payload_check(&self, client: &Qdrant) -> anyhow::Result<()> {
+        let resp = client
+            .scroll(
+                ScrollPointsBuilder::new(&self.collection_name)
+                    .filter(Filter::must([Condition::is_empty("timestamp")])),
+            )
+            .await?;
+
+        let points: Vec<_> = resp.result.into_iter().map(|point| point.id).collect();
+
+        if !points.is_empty() {
+            return Err(anyhow::format_err!(
+                "Points {points:?} are missing timestamp payload!"
+            ));
+        }
+
         Ok(())
     }
 }

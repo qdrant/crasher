@@ -8,7 +8,7 @@ CRASH_PROBABILITY=${3:-"0.3"}
 LOG_FILE="crasher_output.log"
 RUN_TIME=${4:-300}
 
-CRASHER_CMD="cargo run -r -- --working-dir $QDRANT_DIR --exec-path $QDRANT_EXEC --crash-probability $CRASH_PROBABILITY"
+CRASHER_CMD="cargo run -r -- --working-dir $QDRANT_DIR --exec-path $QDRANT_EXEC --crash-probability $CRASH_PROBABILITY --missing-payload-check"
 echo "$CRASHER_CMD"
 $CRASHER_CMD > $LOG_FILE 2>&1 &
 pid=$!

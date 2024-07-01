@@ -55,4 +55,7 @@ pub struct Args {
     /// Whether to perform extra consistency check
     #[arg(long, default_value_t = false)]
     pub consistency_check: bool,
+    /// Enable additional check that all points contain payload
+    #[arg(long)]
+    pub missing_payload_check: bool,
 }
