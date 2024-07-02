@@ -31,16 +31,16 @@ jobs:
         run: |
           qdrant_version="${{ inputs.qdrant_version }}"
           if [ -z "$qdrant_version" ]; then
-            qdrant_version="dev"
+            qdrant_version=dev
           fi
 
           crashing_time="${{ inputs.crashing_time }}"
           if [ -z "$crashing_time" ]; then
-            crashing_time="3600"
+            crashing_time=3600
           fi
 
-          echo "qdrant_version=${qdrant_version}" >> $GITHUB_OUTPUT
-          echo "crashing_time=${crashing_time}" >> $GITHUB_OUTPUT
+          echo "qdrant_version=$qdrant_version" >> $GITHUB_OUTPUT
+          echo "crashing_time=$crashing_time" >> $GITHUB_OUTPUT
       - name: Install minimal stable
         uses: dtolnay/rust-toolchain@stable
       - name: Install Protoc
