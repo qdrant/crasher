@@ -2,13 +2,13 @@
 
 set -e
 
-QDRANT_DIR="${1:-./qdrant/}"
-QDRANT_EXEC="${2:-target/debug/qdrant}"
-CRASH_PROBABILITY="${3:-0.3}"
-RUN_TIME="${4:-300}"
-QDRANT_BACKUP_DIR="${5:-}"
+QDRANT_DIR=${1:-./qdrant/}
+QDRANT_EXEC=${2:-target/debug/qdrant}
+CRASH_PROBABILITY=${3:-0.3}
+RUN_TIME=${4:-300}
+QDRANT_BACKUP_DIR=${5:-}
 
-LOG_FILE="crasher_output.log"
+LOG_FILE=crasher_output.log
 
 CRASHER_CMD=(
     cargo run --release
