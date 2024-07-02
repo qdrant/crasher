@@ -86,24 +86,15 @@ jobs:
           name: crasher-logs
           retention-days: 90 # default max value
           path: crasher_output.log
-      - name: Archive Qdrant storage on failure
-        if: failure() || cancelled()
-        working-directory: /home/runner/work/crasher/crasher
-        shell: bash
-        run: |
-          if [[ -d qdrant-backup ]]
-          then
-            tar -caf qdrant.tar.gz qdrant qdrant-backup
-          else
-            tar -caf qdrant.tar.gz qdrant
-          fi
-      - name: Upload Qdrant storage on failure
+      - name: Upload Qdrant workdir on failure
         uses: actions/upload-artifact@v4
         if: failure() || cancelled()
         with:
-          name: qdrant-data
+          name: qdrant-workdir
           retention-days: 10
-          path: qdrant.tar.gz
+          path: |
+            qdrant/
+            qdrant-backup/
       - name: Send Notification
         if: failure() || cancelled()
         uses: slackapi/slack-github-action@v1.26.0
