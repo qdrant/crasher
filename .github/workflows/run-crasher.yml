@@ -33,12 +33,12 @@ jobs:
           if [ -z "$qdrant_version" ]; then
             qdrant_version="dev"
           fi
-          
+
           crashing_time="${{ inputs.crashing_time }}"
           if [ -z "$crashing_time" ]; then
             crashing_time="3600"
-          fi          
-          
+          fi
+
           echo "qdrant_version=${qdrant_version}" >> $GITHUB_OUTPUT
           echo "crashing_time=${crashing_time}" >> $GITHUB_OUTPUT
       - name: Install minimal stable
@@ -76,7 +76,7 @@ jobs:
           cp -r qdrant-src/config qdrant
 
           crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
-          bakup_working_dir="${{ inputs.backup_working_dir && qdrant-backup }}"
+          bakup_working_dir="${{ inputs.backup_working_dir && 'qdrant-backup' }}"
 
           ./crash-things.sh qdrant ../qdrant-src/target/debug/qdrant 0.3 "$crashing_time" "$backup_working_dir"
       - name: Upload logs on failure
