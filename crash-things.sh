@@ -14,7 +14,7 @@ CRASHER_CMD=(
     cargo run --release
     --
     --working-dir "$QDRANT_DIR"
-    ${QDRANT_BACKUP_DIR:+--backup-working-dir} "${QDRANT_BACKUP_DIR-}"
+    ${QDRANT_BACKUP_DIR:+--backup-working-dir "$QDRANT_BACKUP_DIR"}
     --exec-path "$QDRANT_EXEC"
     --crash-probability "$CRASH_PROBABILITY"
     --missing-payload-check
