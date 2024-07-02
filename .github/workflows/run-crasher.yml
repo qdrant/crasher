@@ -14,6 +14,10 @@ on:
       crashing_time:
         description: "Duration in seconds, default is 3600s (60 min) "
         default: 3600
+      backup_working_dir:
+        description: "Backup working dir before each Qdrant restart"
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -52,24 +56,29 @@ jobs:
         with:
           repository: qdrant/qdrant
           ref: ${{ steps.default_inputs.outputs.qdrant_version }}
-          path: ./qdrant
+          path: ./qdrant-src
       - name: Cache deps
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             /home/runner/work/crasher/crasher
-            /home/runner/work/crasher/crasher/qdrant
+            /home/runner/work/crasher/crasher/qdrant-src
       - name: Build Crasher (release)
-        run: cargo build -r
+        run: cargo build --release
       - name: Build Qdrant (debug)
-        working-directory: /home/runner/work/crasher/crasher/qdrant
+        working-directory: /home/runner/work/crasher/crasher/qdrant-src
         run: cargo build --features "service_debug data-consistency-check"
       - name: Crash things
         working-directory: /home/runner/work/crasher/crasher
         shell: bash
         run: |
+          mkdir qdrant
+          cp -r qdrant-src/config qdrant
+
           crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
-          ./crash-things.sh "/home/runner/work/crasher/crasher/qdrant/" "target/debug/qdrant" "0.3" "$crashing_time"
+          bakup_working_dir="${{ inputs.backup_working_dir && qdrant-backup }}"
+
+          ./crash-things.sh qdrant ../qdrant-src/target/debug/qdrant 0.3 "$crashing_time" "$backup_working_dir"
       - name: Upload logs on failure
         uses: actions/upload-artifact@v4
         if: failure() || cancelled()
@@ -77,6 +86,24 @@ jobs:
           name: crasher-logs
           retention-days: 90 # default max value
           path: crasher_output.log
+      - name: Archive Qdrant storage on failure
+        if: failure() || cancelled()
+        working-directory: /home/runner/work/crasher/crasher
+        shell: bash
+        run: |
+          if [[ -d qdrant-backup ]]
+          then
+            tar -caf qdrant.tar.gz qdrant qdrant-backup
+          else
+            tar -caf qdrant.tar.gz qdrant
+          fi
+      - name: Upload Qdrant storage on failure
+        uses: actions/upload-artifact@v4
+        if: failure() || cancelled()
+        with:
+          name: qdrant-data
+          retention-days: 10
+          path: qdrant.tar.gz
       - name: Send Notification
         if: failure() || cancelled()
         uses: slackapi/slack-github-action@v1.26.0
