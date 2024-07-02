@@ -27,10 +27,13 @@ pid=$!
 echo "The PID is $pid"
 
 function cleanup() {
-    kill -9 $pid 2>/dev/null
+    kill -KILL $pid 2>/dev/null
 }
 
-trap cleanup EXIT INT ERR
+trap cleanup EXIT
+
+trap 'exit $?' ERR
+trap exit INT
 
 if ps -p $pid >/dev/null
 then
