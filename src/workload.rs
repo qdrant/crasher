@@ -1,5 +1,5 @@
 use anyhow::Result;
-use qdrant_client::prelude::point_id::PointIdOptions;
+use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors::VectorsOptions;
 use qdrant_client::qdrant::{Condition, FieldType, Filter, ScrollPointsBuilder, WriteOrdering};
 use qdrant_client::Qdrant;

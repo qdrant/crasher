@@ -1,17 +1,15 @@
 use core::option::Option;
 use core::option::Option::{None, Some};
-use qdrant_client::client::Payload;
-use qdrant_client::prelude::Distance;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::{
-    BinaryQuantization, FieldCondition, Filter, HnswConfigDiff, Match, MultiVectorConfig,
+    BinaryQuantization, Distance, FieldCondition, Filter, HnswConfigDiff, Match, MultiVectorConfig,
     ProductQuantization, QuantizationConfig, ScalarQuantization, SparseIndexConfig,
     SparseVectorParams, VectorParams,
 };
+use qdrant_client::Payload;
 use rand::Rng;
 use std::collections::HashMap;
-
 // TODO do not generate vector configuration manually but create all possibility exhaustively
 
 /// Dense vectors base names
