@@ -72,6 +72,7 @@ impl Workload {
                     log::error!("Workload run failed with violation!\n{}", msg);
                     // send stop signal to the main thread
                     self.stopped.store(true, Ordering::Relaxed);
+                    log::error!("Stopping the workload...");
                     break;
                 }
                 Err(Client(error)) => {
@@ -294,11 +295,17 @@ impl Workload {
             )
             .await?;
 
-        let points: Vec<_> = resp.result.into_iter().map(|point| point.id).collect();
+        let points: Vec<_> = resp
+            .result
+            .into_iter()
+            .map(|point| point.id.and_then(|pid| pid.point_id_options))
+            .collect();
 
         if !points.is_empty() {
             return Err(Invariant(format!(
-                "Points {points:?} are missing timestamp payload!"
+                "Detected {} points missing the 'timestamp' payload key!\n{:?}",
+                points.len(),
+                points,
             )));
         }
 
