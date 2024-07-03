@@ -25,7 +25,7 @@ echo "${CRASHER_CMD[*]}"
 
 QDRANT__LOGGER__ON_DISK__ENABLED=true \
 QDRANT__LOGGER__ON_DISK__LOG_FILE=$QDRANT_LOG \
-"${CRASHER_CMD[@]}" &>"$LOG_FILE" &
+"${CRASHER_CMD[@]}" &>"$CRASHER_LOG" &
 
 pid=$!
 
