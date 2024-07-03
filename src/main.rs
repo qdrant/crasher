@@ -3,6 +3,7 @@ mod client;
 mod crasher_error;
 mod generators;
 mod process;
+mod util;
 mod workload;
 
 use crate::args::Args;
@@ -39,7 +40,7 @@ async fn main() {
     let crash_probability = args.crash_probability;
     let sleep_duration_between_crash_sec = args.sleep_duration_between_crash_sec;
 
-    match ProcessManager::new(&args.working_dir, &args.exec_path) {
+    match ProcessManager::from_args(&args) {
         Err(e) => {
             log::error!("Failed to start Qdrant: {}", e);
         }
