@@ -83,9 +83,11 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure() || cancelled()
         with:
-          name: crasher-logs
+          name: logs
           retention-days: 90 # default max value
-          path: crasher_output.log
+          path: |
+            crasher.log
+            qdrant.log
       - name: Upload Qdrant workdir on failure
         uses: actions/upload-artifact@v4
         if: failure() || cancelled()
