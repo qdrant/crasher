@@ -32,7 +32,10 @@ pid=$!
 echo "The PID is $pid"
 
 function cleanup() {
-    ps -p $pid >/dev/null && kill -KILL $pid
+    if ps -p $pid >/dev/null
+    then
+        kill -KILL $pid
+    fi
 }
 
 trap cleanup EXIT
