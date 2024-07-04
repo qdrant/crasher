@@ -9,7 +9,7 @@ RUN_TIME=${4:-300}
 QDRANT_BACKUP_DIR=${5:-}
 
 CRASHER_LOG=crasher.log
-QDRANT_LOG=qdrant.log
+QDRANT_LOG=../qdrant.log
 
 CRASHER_CMD=(
     cargo run --release
