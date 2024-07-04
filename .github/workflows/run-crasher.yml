@@ -76,9 +76,9 @@ jobs:
           cp -r qdrant-src/config qdrant
 
           crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
-          backup_working_dir="${{ inputs.backup_working_dir && 'qdrant-backup' }}"
+          backup_working_dir="${{ inputs.backup_working_dir && 'qdrant-backup-1 qdrant-backup-2 qdrant-backup-3' }}"
 
-          ./crash-things.sh qdrant ../qdrant-src/target/debug/qdrant 0.3 "$crashing_time" "$backup_working_dir"
+          ./crash-things.sh qdrant ../qdrant-src/target/debug/qdrant 0.3 "$crashing_time" $backup_working_dir
       - name: Upload logs on failure
         uses: actions/upload-artifact@v4
         if: failure() || cancelled()
@@ -96,7 +96,7 @@ jobs:
           retention-days: 10
           path: |
             qdrant/
-            qdrant-backup/
+            qdrant-backup-*/
       - name: Send Notification
         if: failure() || cancelled()
         uses: slackapi/slack-github-action@v1.26.0
