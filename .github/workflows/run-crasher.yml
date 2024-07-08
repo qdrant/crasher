@@ -78,7 +78,7 @@ jobs:
           crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
           backup_working_dir="${{ inputs.backup_working_dir && 'qdrant-backup' }}"
 
-          ./crash-things.sh qdrant ../qdrant-src/target/debug/qdrant 0.3 "$crashing_time" "$backup_working_dir"
+          ./crash-things.sh qdrant ../qdrant-src/target/debug/qdrant 0.3 "$crashing_time" ${backup_working_dir:+"$backup_working_dir"}
       - name: Upload logs on failure
         uses: actions/upload-artifact@v4
         if: failure() || cancelled()
