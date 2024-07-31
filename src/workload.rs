@@ -187,7 +187,7 @@ impl Workload {
                 &self.collection_name,
                 point_id as u64,
                 self.payload_count,
-                self.write_ordering.clone(),
+                self.write_ordering,
             )
             .await?;
         }

@@ -71,7 +71,7 @@ impl TestNamedVectors {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(),
                     quantization_config: None,
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: None,
                     multivector_config: None,
@@ -88,7 +88,7 @@ impl TestNamedVectors {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(),
                     quantization_config: None,
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(false), // rocksdb
                     datatype: None,
                     multivector_config: None,
@@ -105,7 +105,7 @@ impl TestNamedVectors {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(),
                     quantization_config: None,
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: Some(2),   // UInt8
                     multivector_config: None,
@@ -122,7 +122,7 @@ impl TestNamedVectors {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(),
                     quantization_config: None,
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: Some(3),   // Float16
                     multivector_config: None,
@@ -145,7 +145,7 @@ impl TestNamedVectors {
                             always_ram: Some(false),
                         })),
                     }),
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: None,
                     multivector_config: None,
@@ -167,7 +167,7 @@ impl TestNamedVectors {
                             always_ram: Some(false),
                         })),
                     }),
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: None,
                     multivector_config: None,
@@ -188,7 +188,7 @@ impl TestNamedVectors {
                             always_ram: Some(false),
                         })),
                     }),
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: None,
                     multivector_config: None,
@@ -270,10 +270,10 @@ impl TestNamedVectors {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(),
                     quantization_config: None,
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: None,
-                    multivector_config: multivector_config.clone(),
+                    multivector_config,
                 },
             );
         }
@@ -287,10 +287,10 @@ impl TestNamedVectors {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(),
                     quantization_config: None,
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(false), // rocksdb
                     datatype: None,
-                    multivector_config: multivector_config.clone(),
+                    multivector_config,
                 },
             );
         }
@@ -304,10 +304,10 @@ impl TestNamedVectors {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(),
                     quantization_config: None,
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: Some(2),   // UInt8
-                    multivector_config: multivector_config.clone(),
+                    multivector_config,
                 },
             );
         }
@@ -321,10 +321,10 @@ impl TestNamedVectors {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(),
                     quantization_config: None,
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: Some(3),   // Float16
-                    multivector_config: multivector_config.clone(),
+                    multivector_config,
                 },
             );
         }
@@ -344,10 +344,10 @@ impl TestNamedVectors {
                             always_ram: Some(false),
                         })),
                     }),
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: None,
-                    multivector_config: multivector_config.clone(),
+                    multivector_config,
                 },
             );
         }
@@ -366,10 +366,10 @@ impl TestNamedVectors {
                             always_ram: Some(false),
                         })),
                     }),
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: None,
-                    multivector_config: multivector_config.clone(),
+                    multivector_config,
                 },
             );
         }
@@ -387,10 +387,10 @@ impl TestNamedVectors {
                             always_ram: Some(false),
                         })),
                     }),
-                    hnsw_config: hnsw_config.clone(),
+                    hnsw_config,
                     on_disk: Some(true), // on disk
                     datatype: None,
-                    multivector_config: multivector_config.clone(),
+                    multivector_config,
                 },
             );
         }

@@ -354,7 +354,7 @@ pub async fn insert_points_batch(
         client
             .upsert_points(
                 UpsertPointsBuilder::new(collection_name, points)
-                    .ordering(write_ordering.clone().unwrap_or_default())
+                    .ordering(write_ordering.unwrap_or_default())
                     .wait(wait),
             )
             .await

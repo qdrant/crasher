@@ -12,9 +12,9 @@ chrono = "0.4.38"
 rand = "0.8.5"
 clap = { version = "4.5.11", features = ["derive"] }
 futures = { version = "0.3.30", default-features = false, features = ["async-await", "std"] }
-tokio = { version = "1.39.1", features = ["full"] }
+tokio = { version = "1.39.2", features = ["full"] }
 tokio-stream = { version = "0.1.15", default-features = false, features = ["fs"] }
-qdrant-client = "1.10.2"
+qdrant-client = "1.10.3"
 ctrlc = "3.4.4"
 log = "0.4.22"
 env_logger = "0.11.5"
