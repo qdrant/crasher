@@ -5,6 +5,7 @@ use crate::generators::{
     random_dense_vector, random_filter, random_payload, random_sparse_vector, TestNamedVectors,
 };
 use anyhow::Context;
+use qdrant_client::qdrant::payload_index_params::IndexParams;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
 use qdrant_client::qdrant::{
@@ -371,10 +372,12 @@ pub async fn create_field_index(
     collection_name: &str,
     field_name: &str,
     field_type: FieldType,
+    field_index_params: impl Into<IndexParams>,
 ) -> Result<(), anyhow::Error> {
     client
         .create_field_index(
             CreateFieldIndexCollectionBuilder::new(collection_name, field_name, field_type)
+                .field_index_params(field_index_params.into())
                 .wait(true),
         )
         .await

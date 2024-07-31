@@ -1,7 +1,10 @@
 use anyhow::Result;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors::VectorsOptions;
-use qdrant_client::qdrant::{Condition, FieldType, Filter, ScrollPointsBuilder, WriteOrdering};
+use qdrant_client::qdrant::{
+    Condition, DatetimeIndexParamsBuilder, FieldType, Filter, KeywordIndexParamsBuilder,
+    ScrollPointsBuilder, WriteOrdering,
+};
 use qdrant_client::Qdrant;
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -113,6 +116,9 @@ impl Workload {
                 &self.collection_name,
                 KEYWORD_PAYLOAD_KEY,
                 FieldType::Keyword,
+                KeywordIndexParamsBuilder::default()
+                    .is_tenant(true)
+                    .on_disk(true),
             )
             .await?;
 
@@ -122,6 +128,9 @@ impl Workload {
                     &self.collection_name,
                     "timestamp",
                     FieldType::Datetime,
+                    DatetimeIndexParamsBuilder::default()
+                        .is_tenant(true)
+                        .on_disk(true),
                 )
                 .await?;
             }
