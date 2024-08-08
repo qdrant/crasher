@@ -129,7 +129,7 @@ impl Workload {
                     "timestamp",
                     FieldType::Datetime,
                     DatetimeIndexParamsBuilder::default()
-                        .is_tenant(true)
+                        .is_principal(true)
                         .on_disk(true),
                 )
                 .await?;
