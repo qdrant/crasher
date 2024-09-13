@@ -13,7 +13,7 @@ on:
         default: dev
       crashing_time:
         description: "Duration in seconds, default is 21600s (6h)"
-        default: 21600
+        default: 3600
       backup_working_dir:
         description: "Backup working dir before each Qdrant restart"
         type: boolean
