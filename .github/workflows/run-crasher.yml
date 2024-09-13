@@ -12,8 +12,8 @@ on:
         description: "Version of qdrant to checkout (tags/v1.6.1, <commit-id>, my-branch)"
         default: dev
       crashing_time:
-        description: "Duration in seconds, default is 3600s (1h)"
-        default: 3600
+        description: "Duration in seconds, default is 21600s (6h)"
+        default: 21600
       backup_working_dir:
         description: "Backup working dir before each Qdrant restart"
         type: boolean
