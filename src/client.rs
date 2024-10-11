@@ -256,7 +256,7 @@ pub async fn create_collection(
             max_segment_size: None,
             max_optimization_threads: None,
         })
-        .on_disk_payload(false);
+        .on_disk_payload(args.on_disk_payload);
     if let Some(dense_vectors_config) = dense_vectors_config {
         request = request.vectors_config(dense_vectors_config);
     }

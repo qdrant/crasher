@@ -49,6 +49,9 @@ pub struct Args {
     /// Timeout of gRPC client
     #[arg(long, default_value_t = 5_000)]
     pub grpc_timeout_ms: usize,
+    /// Whether to use on-disk payload storage
+    #[arg(long, default_value_t = false)]
+    pub on_disk_payload: bool,
     /// Whether to only upsert sparse vectors
     #[arg(long, default_value_t = false)]
     pub only_sparse: bool,
