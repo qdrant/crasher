@@ -1,5 +1,4 @@
 use anyhow::Result;
-use qdrant_client::qdrant::payload_index_params::IndexParams::GeoIndexParams;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors::VectorsOptions;
 use qdrant_client::qdrant::{
@@ -154,15 +153,15 @@ impl Workload {
             )
             .await?;
 
-            // // create geo index for the payload
-            // create_field_index(
-            //     client,
-            //     &self.collection_name,
-            //     GEO_PAYLOAD_KEY,
-            //     FieldType::Geo,
-            //     GeoIndexParamsBuilder::default()
-            //         .on_disk(true),
-            // ).await?;
+            // create geo index for the payload
+            create_field_index(
+                client,
+                &self.collection_name,
+                GEO_PAYLOAD_KEY,
+                FieldType::Geo,
+                GeoIndexParamsBuilder::default().on_disk(true),
+            )
+            .await?;
 
             // create text payload index
             create_field_index(
@@ -174,14 +173,15 @@ impl Workload {
             )
             .await?;
 
-            // // create boolean index for the payload
-            // create_field_index(
-            //     client,
-            //     &self.collection_name,
-            //     BOOL_PAYLOAD_KEY,
-            //     FieldType::Bool,
-            //     BoolIndexParams{},
-            // ).await?;
+            // create boolean index for the payload
+            create_field_index(
+                client,
+                &self.collection_name,
+                BOOL_PAYLOAD_KEY,
+                FieldType::Bool,
+                BoolIndexParams {},
+            )
+            .await?;
 
             // create timestamp index for payload
             create_field_index(
