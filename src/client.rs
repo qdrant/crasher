@@ -3,6 +3,7 @@ use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::Cancelled;
 use crate::generators::{
     random_dense_vector, random_filter, random_payload, random_sparse_vector, TestNamedVectors,
+    MISSING_PAYLOAD_TIMESTAMP_KEY,
 };
 use anyhow::Context;
 use qdrant_client::qdrant::payload_index_params::IndexParams;
@@ -341,7 +342,7 @@ pub async fn insert_points_batch(
 
             if timestamp_payload {
                 payload.insert(
-                    "timestamp",
+                    MISSING_PAYLOAD_TIMESTAMP_KEY,
                     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
                 );
             }

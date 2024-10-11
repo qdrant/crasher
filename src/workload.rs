@@ -1,9 +1,12 @@
 use anyhow::Result;
+use qdrant_client::qdrant::payload_index_params::IndexParams::GeoIndexParams;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors::VectorsOptions;
 use qdrant_client::qdrant::{
-    Condition, DatetimeIndexParamsBuilder, FieldType, Filter, KeywordIndexParamsBuilder,
-    ScrollPointsBuilder, WriteOrdering,
+    BoolIndexParams, Condition, DatetimeIndexParamsBuilder, FieldType, Filter,
+    FloatIndexParamsBuilder, GeoIndexParamsBuilder, IntegerIndexParamsBuilder,
+    KeywordIndexParamsBuilder, ScrollPointsBuilder, TextIndexParamsBuilder, TokenizerType,
+    UuidIndexParamsBuilder, WriteOrdering,
 };
 use qdrant_client::Qdrant;
 use std::collections::HashSet;
@@ -18,7 +21,10 @@ use crate::client::{
 };
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
-use crate::generators::{TestNamedVectors, KEYWORD_PAYLOAD_KEY};
+use crate::generators::{
+    TestNamedVectors, BOOL_PAYLOAD_KEY, DATETIME_PAYLOAD_KEY, FLOAT_PAYLOAD_KEY, GEO_PAYLOAD_KEY,
+    INTEGER_PAYLOAD_KEY, KEYWORD_PAYLOAD_KEY, MISSING_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY,
+};
 
 pub struct Workload {
     collection_name: String,
@@ -111,6 +117,8 @@ impl Workload {
                 args.clone(),
             )
             .await?;
+
+            // create keyword index for the payload
             create_field_index(
                 client,
                 &self.collection_name,
@@ -122,11 +130,88 @@ impl Workload {
             )
             .await?;
 
+            // create integer index for the payload
+            create_field_index(
+                client,
+                &self.collection_name,
+                INTEGER_PAYLOAD_KEY,
+                FieldType::Integer,
+                IntegerIndexParamsBuilder::new(true, true)
+                    .is_principal(true)
+                    .on_disk(true),
+            )
+            .await?;
+
+            // create float index for the payload
+            create_field_index(
+                client,
+                &self.collection_name,
+                FLOAT_PAYLOAD_KEY,
+                FieldType::Float,
+                FloatIndexParamsBuilder::default()
+                    .is_principal(true)
+                    .on_disk(true),
+            )
+            .await?;
+
+            // // create geo index for the payload
+            // create_field_index(
+            //     client,
+            //     &self.collection_name,
+            //     GEO_PAYLOAD_KEY,
+            //     FieldType::Geo,
+            //     GeoIndexParamsBuilder::default()
+            //         .on_disk(true),
+            // ).await?;
+
+            // create text payload index
+            create_field_index(
+                client,
+                &self.collection_name,
+                TEXT_PAYLOAD_KEY,
+                FieldType::Text,
+                TextIndexParamsBuilder::new(TokenizerType::Word).on_disk(true),
+            )
+            .await?;
+
+            // // create boolean index for the payload
+            // create_field_index(
+            //     client,
+            //     &self.collection_name,
+            //     BOOL_PAYLOAD_KEY,
+            //     FieldType::Bool,
+            //     BoolIndexParams{},
+            // ).await?;
+
+            // create timestamp index for payload
+            create_field_index(
+                client,
+                &self.collection_name,
+                DATETIME_PAYLOAD_KEY,
+                FieldType::Datetime,
+                DatetimeIndexParamsBuilder::default()
+                    .is_principal(true)
+                    .on_disk(true),
+            )
+            .await?;
+
+            // create UUID index for the payload
+            create_field_index(
+                client,
+                &self.collection_name,
+                "uuid",
+                FieldType::Uuid,
+                UuidIndexParamsBuilder::default()
+                    .is_tenant(true)
+                    .on_disk(true),
+            )
+            .await?;
+
             if args.missing_payload_check {
                 create_field_index(
                     client,
                     &self.collection_name,
-                    "timestamp",
+                    MISSING_PAYLOAD_TIMESTAMP_KEY,
                     FieldType::Datetime,
                     DatetimeIndexParamsBuilder::default()
                         .is_principal(true)
@@ -299,8 +384,9 @@ impl Workload {
     async fn missing_payload_check(&self, client: &Qdrant) -> Result<(), CrasherError> {
         let resp = client
             .scroll(
-                ScrollPointsBuilder::new(&self.collection_name)
-                    .filter(Filter::must([Condition::is_empty("timestamp")])),
+                ScrollPointsBuilder::new(&self.collection_name).filter(Filter::must([
+                    Condition::is_empty(MISSING_PAYLOAD_TIMESTAMP_KEY),
+                ])),
             )
             .await?;
 
@@ -312,8 +398,9 @@ impl Workload {
 
         if !points.is_empty() {
             return Err(Invariant(format!(
-                "Detected {} points missing the 'timestamp' payload key!\n{:?}",
+                "Detected {} points missing the '{}' payload key!\n{:?}",
                 points.len(),
+                MISSING_PAYLOAD_TIMESTAMP_KEY,
                 points,
             )));
         }

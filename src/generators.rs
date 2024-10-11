@@ -9,6 +9,7 @@ use qdrant_client::qdrant::{
 };
 use qdrant_client::Payload;
 use rand::Rng;
+use serde_json::json;
 use std::collections::HashMap;
 // TODO do not generate vector configuration manually but create all possibility exhaustively
 
@@ -37,7 +38,15 @@ pub const MULTI_VECTOR_NAME_PQ: &str = "multi-dense-vector-pq";
 pub const MULTI_VECTOR_NAME_BQ: &str = "multi-dense-vector-bq";
 
 /// Payload keys
+pub const MISSING_PAYLOAD_TIMESTAMP_KEY: &str = "missing-payload-timestamp";
 pub const KEYWORD_PAYLOAD_KEY: &str = "crasher-payload-keyword";
+pub const INTEGER_PAYLOAD_KEY: &str = "crasher-payload-integer";
+pub const FLOAT_PAYLOAD_KEY: &str = "crasher-float-integer";
+pub const GEO_PAYLOAD_KEY: &str = "crasher-payload-geo";
+pub const TEXT_PAYLOAD_KEY: &str = "crasher-payload-text";
+pub const BOOL_PAYLOAD_KEY: &str = "crasher-payload-bool";
+pub const DATETIME_PAYLOAD_KEY: &str = "crasher-payload-datetime";
+pub const UUID_PAYLOAD_KEY: &str = "crasher-payload-uuid";
 
 #[derive(Debug)]
 pub struct TestNamedVectors {
@@ -427,23 +436,39 @@ impl TestNamedVectors {
     }
 }
 
-pub fn random_keyword(num_variants: usize) -> String {
-    let mut rng = rand::thread_rng();
+pub fn random_keyword(rng: &mut impl Rng, num_variants: usize) -> String {
     let variant = rng.gen_range(0..num_variants);
     format!("keyword_{}", variant)
 }
 
 pub fn random_payload(keywords: Option<usize>) -> Payload {
     let mut payload = Payload::new();
+    let mut rng = rand::thread_rng();
     if let Some(keyword_variants) = keywords {
         if keyword_variants > 0 {
-            payload.insert(KEYWORD_PAYLOAD_KEY, random_keyword(keyword_variants));
+            payload.insert(
+                KEYWORD_PAYLOAD_KEY,
+                random_keyword(&mut rng, keyword_variants),
+            );
+            payload.insert(INTEGER_PAYLOAD_KEY, rng.gen_range(0..100));
+            payload.insert(FLOAT_PAYLOAD_KEY, rng.gen_range(0.0..100.0));
+            // create geo payload with random coordinates
+            let geo_value = json!({
+                "lat": rng.gen_range(-90.0..90.0),
+                "lon": rng.gen_range(-180.0..180.0),
+            });
+            payload.insert(GEO_PAYLOAD_KEY, geo_value);
+            payload.insert(TEXT_PAYLOAD_KEY, random_keyword(&mut rng, keyword_variants));
+            payload.insert(BOOL_PAYLOAD_KEY, rng.gen_bool(0.5));
+            payload.insert(DATETIME_PAYLOAD_KEY, chrono::Utc::now().to_rfc3339());
+            payload.insert(UUID_PAYLOAD_KEY, uuid::Uuid::new_v4().to_string());
         }
     }
     payload
 }
 
 pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
+    let mut rng = rand::thread_rng();
     let mut filter = Filter {
         should: vec![],
         must: vec![],
@@ -457,7 +482,10 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
             FieldCondition {
                 key: KEYWORD_PAYLOAD_KEY.to_string(),
                 r#match: Some(Match {
-                    match_value: Some(MatchValue::Keyword(random_keyword(keyword_variants))),
+                    match_value: Some(MatchValue::Keyword(random_keyword(
+                        &mut rng,
+                        keyword_variants,
+                    ))),
                 }),
                 range: None,
                 geo_bounding_box: None,
