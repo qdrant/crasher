@@ -45,6 +45,8 @@ Options:
           Maximum size (in KiloBytes) of vectors to store in-memory per segment
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
           Timeout of gRPC client [default: 5000]
+      --on-disk-payload
+          Whether to use on-disk payload storage
       --only-sparse
           Whether to only upsert sparse vectors
       --duplication-factor <DUPLICATION_FACTOR>
