@@ -23,8 +23,9 @@ CRASHER_CMD=(
 
 echo "${CRASHER_CMD[*]}"
 
-# TODO remove `on_disk_payload_uses_mmap` once it can be done through the API
+# TODO remove `*_USES_MMAP` once it can be done through the API
 QDRANT__STORAGE__ON_DISK_PAYLOAD_USES_MMAP=true \
+QDRANT__STORAGE__ON_DISK_SPARSE_VECTORS_USES_MMAP=true \
 QDRANT__LOGGER__ON_DISK__ENABLED=true \
 QDRANT__LOGGER__ON_DISK__LOG_FILE=$QDRANT_LOG \
 "${CRASHER_CMD[@]}" &>"$CRASHER_LOG" &
