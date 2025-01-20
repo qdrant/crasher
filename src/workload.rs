@@ -179,7 +179,7 @@ impl Workload {
                 &self.collection_name,
                 BOOL_PAYLOAD_KEY,
                 FieldType::Bool,
-                BoolIndexParamsBuilder::new().on_disk(false),
+                BoolIndexParamsBuilder::new().on_disk(true),
             )
             .await?;
 
