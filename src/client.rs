@@ -256,6 +256,7 @@ pub async fn create_collection(
             memmap_threshold: args.memmap_threshold.map(|i| i as u64),
             max_segment_size: None,
             max_optimization_threads: None,
+            deprecated_max_optimization_threads: None,
         })
         .on_disk_payload(args.on_disk_payload);
     if let Some(dense_vectors_config) = dense_vectors_config {
@@ -324,7 +325,7 @@ pub async fn insert_points_batch(
                 // multi dense
                 for name in test_named_vectors.multi_vector_names() {
                     let vec_count = rand::thread_rng().gen_range(1..5);
-                    let multi_vector = (0..vec_count)
+                    let multi_vector: Vec<Vec<_>> = (0..vec_count)
                         .map(|_| random_dense_vector(vec_dim))
                         .collect();
                     vectors_map.insert(name.clone(), Vector::new_multi(multi_vector));

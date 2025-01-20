@@ -1,8 +1,8 @@
 use anyhow::Result;
 use qdrant_client::qdrant::point_id::PointIdOptions;
-use qdrant_client::qdrant::vectors::VectorsOptions;
+use qdrant_client::qdrant::vectors_output::VectorsOptions;
 use qdrant_client::qdrant::{
-    BoolIndexParams, Condition, DatetimeIndexParamsBuilder, FieldType, Filter,
+    BoolIndexParamsBuilder, Condition, DatetimeIndexParamsBuilder, FieldType, Filter,
     FloatIndexParamsBuilder, GeoIndexParamsBuilder, IntegerIndexParamsBuilder,
     KeywordIndexParamsBuilder, ScrollPointsBuilder, TextIndexParamsBuilder, TokenizerType,
     UuidIndexParamsBuilder, WriteOrdering,
@@ -179,7 +179,7 @@ impl Workload {
                 &self.collection_name,
                 BOOL_PAYLOAD_KEY,
                 FieldType::Bool,
-                BoolIndexParams {},
+                BoolIndexParamsBuilder::new().on_disk(true),
             )
             .await?;
 
