@@ -55,7 +55,7 @@ async fn main() {
                     }
                     log::info!(
                         "Qdrant is ready! Crashing it with a probability of {}%",
-                        crash_probability
+                        crash_probability * 100.0
                     );
 
                     // workload task
