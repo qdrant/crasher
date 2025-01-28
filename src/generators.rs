@@ -437,29 +437,29 @@ impl TestNamedVectors {
 }
 
 pub fn random_keyword(rng: &mut impl Rng, num_variants: usize) -> String {
-    let variant = rng.gen_range(0..num_variants);
+    let variant = rng.random_range(0..num_variants);
     format!("keyword_{}", variant)
 }
 
 pub fn random_payload(keywords: Option<usize>) -> Payload {
     let mut payload = Payload::new();
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     if let Some(keyword_variants) = keywords {
         if keyword_variants > 0 {
             payload.insert(
                 KEYWORD_PAYLOAD_KEY,
                 random_keyword(&mut rng, keyword_variants),
             );
-            payload.insert(INTEGER_PAYLOAD_KEY, rng.gen_range(0..100));
-            payload.insert(FLOAT_PAYLOAD_KEY, rng.gen_range(0.0..100.0));
+            payload.insert(INTEGER_PAYLOAD_KEY, rng.random_range(0..100));
+            payload.insert(FLOAT_PAYLOAD_KEY, rng.random_range(0.0..100.0));
             // create geo payload with random coordinates
             let geo_value = json!({
-                "lat": rng.gen_range(-90.0..90.0),
-                "lon": rng.gen_range(-180.0..180.0),
+                "lat": rng.random_range(-90.0..90.0),
+                "lon": rng.random_range(-180.0..180.0),
             });
             payload.insert(GEO_PAYLOAD_KEY, geo_value);
             payload.insert(TEXT_PAYLOAD_KEY, random_keyword(&mut rng, keyword_variants));
-            payload.insert(BOOL_PAYLOAD_KEY, rng.gen_bool(0.5));
+            payload.insert(BOOL_PAYLOAD_KEY, rng.random_bool(0.5));
             payload.insert(DATETIME_PAYLOAD_KEY, chrono::Utc::now().to_rfc3339());
             payload.insert(UUID_PAYLOAD_KEY, uuid::Uuid::new_v4().to_string());
         }
@@ -468,7 +468,7 @@ pub fn random_payload(keywords: Option<usize>) -> Payload {
 }
 
 pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut filter = Filter {
         should: vec![],
         must: vec![],
@@ -505,27 +505,27 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
 }
 
 pub fn random_dense_vector(dim: usize) -> Vec<f32> {
-    let mut rng = rand::thread_rng();
-    (0..dim).map(|_| rng.gen_range(-1.0..1.0)).collect()
+    let mut rng = rand::rng();
+    (0..dim).map(|_| rng.random_range(-1.0..1.0)).collect()
 }
 
 pub fn random_sparse_vector(max_size: usize, sparsity: f64) -> Vec<(u32, f32)> {
-    let mut rng = rand::thread_rng();
-    let size = rng.gen_range(1..=max_size);
+    let mut rng = rand::rng();
+    let size = rng.random_range(1..=max_size);
     // (index, value)
     let mut pairs = Vec::with_capacity(size);
     for i in 1..=size {
         // probability of skipping a dimension to make the vectors sparse
-        let skip = !rng.gen_bool(sparsity);
+        let skip = !rng.random_bool(sparsity);
         if skip {
             continue;
         }
         // Only positive values are generated to make sure to hit the pruning path.
-        pairs.push((i as u32, rng.gen_range(0.0..10.0) as f32));
+        pairs.push((i as u32, rng.random_range(0.0..10.0) as f32));
     }
     if pairs.is_empty() {
         // make sure at least one dimension is present
-        pairs.push((1, rng.gen_range(0.0..10.0) as f32));
+        pairs.push((1, rng.random_range(0.0..10.0) as f32));
     }
     pairs
 }

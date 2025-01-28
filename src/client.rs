@@ -173,7 +173,7 @@ pub async fn query_batch_points(
         }
         // multi dense
         for multi_dense_name in test_named_vectors.multi_vector_names() {
-            let vec_count = rand::thread_rng().gen_range(1..5);
+            let vec_count = rand::rng().random_range(1..5);
             let multi_vector: Vec<_> = (0..vec_count)
                 .map(|_| random_dense_vector(vec_dim))
                 .collect();
@@ -324,7 +324,7 @@ pub async fn insert_points_batch(
                 }
                 // multi dense
                 for name in test_named_vectors.multi_vector_names() {
-                    let vec_count = rand::thread_rng().gen_range(1..5);
+                    let vec_count = rand::rng().random_range(1..5);
                     let multi_vector: Vec<Vec<_>> = (0..vec_count)
                         .map(|_| random_dense_vector(vec_dim))
                         .collect();

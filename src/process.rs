@@ -95,8 +95,8 @@ impl ProcessManager {
             }
 
             let drawn = {
-                let mut rng = rand::thread_rng();
-                rng.gen_bool(crash_probability)
+                let mut rng = rand::rng();
+                rng.random_bool(crash_probability)
             };
             if drawn {
                 log::info!("** Restarting qdrant **");
