@@ -384,9 +384,11 @@ impl Workload {
     async fn missing_payload_check(&self, client: &Qdrant) -> Result<(), CrasherError> {
         let resp = client
             .scroll(
-                ScrollPointsBuilder::new(&self.collection_name).filter(Filter::must([
-                    Condition::is_empty(MISSING_PAYLOAD_TIMESTAMP_KEY),
-                ])),
+                ScrollPointsBuilder::new(&self.collection_name)
+                    .filter(Filter::must([Condition::is_empty(
+                        MISSING_PAYLOAD_TIMESTAMP_KEY,
+                    )]))
+                    .limit(self.points_count.try_into().unwrap()),
             )
             .await?;
 
