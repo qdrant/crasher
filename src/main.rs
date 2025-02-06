@@ -51,9 +51,10 @@ async fn main() {
                 Some(child_process_id) => {
                     log::info!("Child qdrant process id {:?}", child_process_id);
                     log::info!("Waiting for qdrant to be ready...");
-                    if let Err(e) = wait_server_ready(&client.clone(), stopped.clone(), false).await
+                    if let Err(err) =
+                        wait_server_ready(&client.clone(), stopped.clone(), false).await
                     {
-                        log::error!("Failed to wait for qdrant to be ready: {}", e);
+                        log::error!("Failed to wait for qdrant to be ready: {err:#}");
                         exit(1)
                     }
                     log::info!(
