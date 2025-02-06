@@ -87,13 +87,13 @@ impl Workload {
                     // turn client error into hard error if it is a server error (a bit hacky)
                     let debug_error = format!("{:?}", error);
                     if debug_error.contains("Service internal error") {
-                        log::error!("Workload run failed due to a server error!\n{error:#}");
+                        log::error!("Workload run failed due to a server error!\n{error:?}");
                         // send stop signal to the main thread
                         self.stopped.store(true, Ordering::Relaxed);
                         break;
                     } else {
                         log::warn!(
-                            "Workload run failed due to client error - resuming soon\n{error:#}"
+                            "Workload run failed due to client error - resuming soon\n{error:?}"
                         );
                         // no need to hammer the server while it restarts
                         sleep(std::time::Duration::from_secs(3)).await;

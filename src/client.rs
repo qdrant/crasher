@@ -47,7 +47,7 @@ pub async fn wait_server_ready(
                         "Server did not start in time, /readyz not ready".to_string(),
                     ));
                 } else {
-                    log::debug!("Healthcheck failed: {err:#}")
+                    log::debug!("Healthcheck failed: {err:?}")
                 }
             }
         }

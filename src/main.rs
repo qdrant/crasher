@@ -54,7 +54,7 @@ async fn main() {
                     if let Err(err) =
                         wait_server_ready(&client.clone(), stopped.clone(), false).await
                     {
-                        log::error!("Failed to wait for qdrant to be ready: {err:#}");
+                        log::error!("Failed to wait for qdrant to be ready: {err:?}");
                         exit(1)
                     }
                     log::info!(
