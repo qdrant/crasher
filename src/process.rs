@@ -84,6 +84,7 @@ impl ProcessManager {
 
     pub async fn chaos(
         &mut self,
+        collection_name: &str,
         stopped: Arc<AtomicBool>,
         client: &Qdrant,
         crash_probability: f64,
@@ -112,7 +113,9 @@ impl ProcessManager {
 
                 self.child_process = start_process(&self.working_dir, &self.binary_path).unwrap();
 
-                if let Err(e) = wait_server_ready(client, stopped.clone()).await {
+                if let Err(e) =
+                    wait_server_ready(client, stopped.clone(), Some(collection_name)).await
+                {
                     log::error!("Failed to wait for qdrant to be ready: {}", e);
                     exit(1);
                 }
