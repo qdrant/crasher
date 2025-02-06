@@ -77,7 +77,7 @@ impl Workload {
                     break;
                 }
                 Err(Invariant(msg)) => {
-                    log::error!("Workload run failed with violation!\n{}", msg);
+                    log::error!("Workload run failed with violation!\n{msg}");
                     // send stop signal to the main thread
                     self.stopped.store(true, Ordering::Relaxed);
                     log::error!("Stopping the workload...");
@@ -220,7 +220,7 @@ impl Workload {
             }
 
             let collection_info = get_collection_info(client, &self.collection_name).await?;
-            log::info!("Collection info: {:#?}", collection_info);
+            log::info!("Collection info: {collection_info:#?}");
         }
 
         let current_count = get_points_count(client, &self.collection_name).await?;
@@ -228,7 +228,7 @@ impl Workload {
             if args.consistency_check {
                 // can be disabled if qdrant is running internal data consistency check on the server side
                 // `cargo run --features data-consistency-check`
-                log::info!("Run: pre vector data consistency check ({})", current_count);
+                log::info!("Run: pre vector data consistency check ({current_count})");
                 self.vector_data_consistency_check(client, current_count)
                     .await?;
             }
@@ -238,7 +238,7 @@ impl Workload {
                 self.missing_payload_check(client).await?;
             }
 
-            log::info!("Run: delete existing points ({})", current_count);
+            log::info!("Run: delete existing points ({current_count})");
             delete_points(client, &self.collection_name, current_count).await?;
         }
 

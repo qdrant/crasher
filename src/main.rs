@@ -43,13 +43,13 @@ async fn main() {
     let sleep_duration_between_crash_sec = args.sleep_duration_between_crash_sec;
 
     match ProcessManager::from_args(&args) {
-        Err(e) => {
-            log::error!("Failed to start Qdrant: {}", e);
+        Err(err) => {
+            log::error!("Failed to start Qdrant: {err}");
         }
         Ok(mut process_manager) => {
             match process_manager.child_process.id() {
                 Some(child_process_id) => {
-                    log::info!("Child qdrant process id {:?}", child_process_id);
+                    log::info!("Child qdrant process id {child_process_id:?}");
                     log::info!("Waiting for qdrant to be ready...");
                     if let Err(err) =
                         wait_server_ready(&client.clone(), stopped.clone(), false).await
@@ -59,7 +59,7 @@ async fn main() {
                     }
                     log::info!(
                         "Qdrant is ready! Crashing it with a probability of {}%",
-                        crash_probability * 100.0
+                        crash_probability * 100.0,
                     );
 
                     let collection_name = COLLECTION_NAME;
