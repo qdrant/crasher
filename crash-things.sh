@@ -19,6 +19,7 @@ CRASHER_CMD=(
     --exec-path "$QDRANT_EXEC"
     --crash-probability "$CRASH_PROBABILITY"
     --missing-payload-check
+    --wait
 )
 
 echo "${CRASHER_CMD[*]}"
