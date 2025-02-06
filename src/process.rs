@@ -112,7 +112,7 @@ impl ProcessManager {
 
                 self.child_process = start_process(&self.working_dir, &self.binary_path).unwrap();
 
-                if let Err(e) = wait_server_ready(client, stopped.clone()).await {
+                if let Err(e) = wait_server_ready(client, stopped.clone(), true).await {
                     log::error!("Failed to wait for qdrant to be ready: {}", e);
                     exit(1);
                 }

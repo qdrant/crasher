@@ -38,18 +38,18 @@ pub struct Workload {
 
 impl Workload {
     pub fn new(
+        collection_name: &str,
         stopped: Arc<AtomicBool>,
         duplication_factor: usize,
         points_count: usize,
         vec_dim: usize,
     ) -> Self {
-        let collection_name = "workload-crasher".to_string();
         let payload_count = 1;
         let search_count = 1;
         let test_named_vectors = TestNamedVectors::new(duplication_factor, vec_dim);
         let write_ordering = None; // default
         Workload {
-            collection_name,
+            collection_name: collection_name.to_string(),
             test_named_vectors,
             search_count,
             points_count,

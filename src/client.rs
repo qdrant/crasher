@@ -5,6 +5,7 @@ use crate::generators::{
     random_dense_vector, random_filter, random_payload, random_sparse_vector, TestNamedVectors,
     MISSING_PAYLOAD_TIMESTAMP_KEY,
 };
+use crate::COLLECTION_NAME;
 use anyhow::Context;
 use qdrant_client::qdrant::payload_index_params::IndexParams;
 use qdrant_client::qdrant::point_id::PointIdOptions;
@@ -12,7 +13,7 @@ use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
 use qdrant_client::qdrant::{
     CollectionInfo, CountPointsBuilder, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder,
     DeletePointsBuilder, FieldType, GetPointsBuilder, GetResponse, OptimizersConfigDiff, PointId,
-    PointStruct, Query, QueryBatchPointsBuilder, QueryBatchResponse, QueryPoints,
+    PointStruct, Query, QueryBatchPointsBuilder, QueryBatchResponse, QueryPoints, ReplicaState,
     SetPayloadPointsBuilder, SparseVectorConfig, UpsertPointsBuilder, Vector, VectorInput,
     VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
@@ -28,8 +29,10 @@ use tokio::time::sleep;
 pub async fn wait_server_ready(
     client: &Qdrant,
     stopped: Arc<AtomicBool>,
+    wait_for_replicas: bool,
 ) -> Result<f64, CrasherError> {
     let start = std::time::Instant::now();
+
     loop {
         if stopped.load(Ordering::Relaxed) {
             return Err(Cancelled);
@@ -41,7 +44,7 @@ pub async fn wait_server_ready(
             Err(e) => {
                 if start.elapsed().as_secs_f64() > 60.0 {
                     return Err(CrasherError::Invariant(
-                        "Server did not start in time".to_string(),
+                        "Server did not start in time, /readyz not ready".to_string(),
                     ));
                 } else {
                     log::debug!("Healthcheck failed: {}", e)
@@ -49,6 +52,39 @@ pub async fn wait_server_ready(
             }
         }
     }
+
+    if wait_for_replicas {
+        loop {
+            if stopped.load(Ordering::Relaxed) {
+                return Err(Cancelled);
+            }
+
+            let cluster_info = client.collection_cluster_info(COLLECTION_NAME).await?;
+
+            let all_local_active = cluster_info
+                .local_shards
+                .iter()
+                .all(|shard| shard.state == ReplicaState::Active as i32);
+            let all_remote_active = cluster_info
+                .remote_shards
+                .iter()
+                .all(|shard| shard.state == ReplicaState::Active as i32);
+
+            if all_local_active && all_remote_active {
+                break;
+            }
+
+            // Wait up to 3 minutes for recovery to finish
+            if start.elapsed().as_secs_f64() > 180.0 {
+                return Err(CrasherError::Invariant(
+                    "Server did not start in time, not all replicas are active".to_string(),
+                ));
+            }
+
+            sleep(Duration::from_secs(1)).await;
+        }
+    }
+
     Ok(start.elapsed().as_secs_f64())
 }
 
