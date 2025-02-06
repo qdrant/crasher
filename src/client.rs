@@ -277,6 +277,7 @@ pub async fn insert_points_batch(
     collection_name: &str,
     points_count: usize,
     vec_dim: usize,
+    always_wait: bool,
     payload_count: usize,
     timestamp_payload: bool,
     only_sparse_vectors: bool,
@@ -303,7 +304,7 @@ pub async fn insert_points_batch(
         let (wait, batch_size) = if batch_id == num_batches - 1 {
             (true, last_batch_size)
         } else {
-            (false, batch_size)
+            (always_wait, batch_size)
         };
         let mut points = Vec::with_capacity(batch_size);
         let batch_base_id = batch_id as u64 * max_batch_size as u64;

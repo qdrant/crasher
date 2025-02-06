@@ -249,6 +249,7 @@ impl Workload {
             &self.collection_name,
             self.points_count,
             self.vec_dim,
+            args.wait,
             0,                          // no payload at first
             args.missing_payload_check, // add timestamp payload for the missing payload check
             args.only_sparse,
