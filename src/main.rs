@@ -51,7 +51,7 @@ async fn main() {
                 Some(child_process_id) => {
                     log::info!("Child qdrant process id {:?}", child_process_id);
                     log::info!("Waiting for qdrant to be ready...");
-                    if let Err(e) = wait_server_ready(&client.clone(), stopped.clone(), None).await
+                    if let Err(e) = wait_server_ready(&client.clone(), stopped.clone(), false).await
                     {
                         log::error!("Failed to wait for qdrant to be ready: {}", e);
                         exit(1)
@@ -83,7 +83,6 @@ async fn main() {
                     let process_manager_task = tokio::spawn(async move {
                         process_manager
                             .chaos(
-                                collection_name,
                                 stopped.clone(),
                                 &client.clone(),
                                 crash_probability,

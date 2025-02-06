@@ -5,6 +5,7 @@ use crate::generators::{
     random_dense_vector, random_filter, random_payload, random_sparse_vector, TestNamedVectors,
     MISSING_PAYLOAD_TIMESTAMP_KEY,
 };
+use crate::COLLECTION_NAME;
 use anyhow::Context;
 use qdrant_client::qdrant::payload_index_params::IndexParams;
 use qdrant_client::qdrant::point_id::PointIdOptions;
@@ -28,7 +29,7 @@ use tokio::time::sleep;
 pub async fn wait_server_ready(
     client: &Qdrant,
     stopped: Arc<AtomicBool>,
-    collection_replicas_active: Option<&str>,
+    wait_for_replicas: bool,
 ) -> Result<f64, CrasherError> {
     let start = std::time::Instant::now();
 
@@ -52,13 +53,13 @@ pub async fn wait_server_ready(
         }
     }
 
-    if let Some(collection) = collection_replicas_active {
+    if wait_for_replicas {
         loop {
             if stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
             }
 
-            let cluster_info = client.collection_cluster_info(collection).await?;
+            let cluster_info = client.collection_cluster_info(COLLECTION_NAME).await?;
 
             let all_local_active = cluster_info
                 .local_shards
@@ -73,7 +74,8 @@ pub async fn wait_server_ready(
                 break;
             }
 
-            if start.elapsed().as_secs_f64() > 60.0 {
+            // Wait up to 3 minutes for recovery to finish
+            if start.elapsed().as_secs_f64() > 180.0 {
                 return Err(CrasherError::Invariant(
                     "Server did not start in time, not all replicas are active".to_string(),
                 ));
