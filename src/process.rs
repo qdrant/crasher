@@ -104,7 +104,7 @@ impl ProcessManager {
 
                 if let Err(err) = self.backup_working_dir().await {
                     log::error!(
-                        "Failed to backup working dir {} to {}: {err}",
+                        "Failed to backup working dir {} to {}: {err:?}",
                         self.working_dir,
                         self.backup_dirs.front().expect("backup dir"),
                     );
@@ -112,8 +112,8 @@ impl ProcessManager {
 
                 self.child_process = start_process(&self.working_dir, &self.binary_path).unwrap();
 
-                if let Err(e) = wait_server_ready(client, stopped.clone(), true).await {
-                    log::error!("Failed to wait for qdrant to be ready: {}", e);
+                if let Err(err) = wait_server_ready(client, stopped.clone(), true).await {
+                    log::error!("Failed to wait for qdrant to be ready: {err:?}");
                     exit(1);
                 }
 

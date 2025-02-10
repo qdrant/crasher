@@ -41,13 +41,13 @@ pub async fn wait_server_ready(
         let healthcheck = client.health_check().await;
         match healthcheck {
             Ok(_) => break,
-            Err(e) => {
+            Err(err) => {
                 if start.elapsed().as_secs_f64() > 60.0 {
                     return Err(CrasherError::Invariant(
                         "Server did not start in time, /readyz not ready".to_string(),
                     ));
                 } else {
-                    log::debug!("Healthcheck failed: {}", e)
+                    log::debug!("Healthcheck failed: {err:?}")
                 }
             }
         }
