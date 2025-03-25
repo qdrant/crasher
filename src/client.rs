@@ -1,12 +1,13 @@
+use crate::COLLECTION_NAME;
 use crate::args::Args;
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::Cancelled;
 use crate::generators::{
-    random_dense_vector, random_filter, random_payload, random_sparse_vector, TestNamedVectors,
-    MISSING_PAYLOAD_TIMESTAMP_KEY,
+    MISSING_PAYLOAD_TIMESTAMP_KEY, TestNamedVectors, random_dense_vector, random_filter,
+    random_payload, random_sparse_vector,
 };
-use crate::COLLECTION_NAME;
 use anyhow::Context;
+use qdrant_client::Qdrant;
 use qdrant_client::qdrant::payload_index_params::IndexParams;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
@@ -17,11 +18,10 @@ use qdrant_client::qdrant::{
     SetPayloadPointsBuilder, SparseVectorConfig, UpsertPointsBuilder, Vector, VectorInput,
     VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
-use qdrant_client::Qdrant;
 use rand::Rng;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::time::sleep;
 

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use qdrant_client::Qdrant;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_output::VectorsOptions;
 use qdrant_client::qdrant::{
@@ -7,10 +8,9 @@ use qdrant_client::qdrant::{
     KeywordIndexParamsBuilder, ScrollPointsBuilder, TextIndexParamsBuilder, TokenizerType,
     UuidIndexParamsBuilder, WriteOrdering,
 };
-use qdrant_client::Qdrant;
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::time::sleep;
 
 use crate::args::Args;
@@ -21,8 +21,9 @@ use crate::client::{
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
 use crate::generators::{
-    TestNamedVectors, BOOL_PAYLOAD_KEY, DATETIME_PAYLOAD_KEY, FLOAT_PAYLOAD_KEY, GEO_PAYLOAD_KEY,
+    BOOL_PAYLOAD_KEY, DATETIME_PAYLOAD_KEY, FLOAT_PAYLOAD_KEY, GEO_PAYLOAD_KEY,
     INTEGER_PAYLOAD_KEY, KEYWORD_PAYLOAD_KEY, MISSING_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY,
+    TestNamedVectors, UUID_PAYLOAD_KEY,
 };
 
 pub struct Workload {
@@ -198,7 +199,7 @@ impl Workload {
             create_field_index(
                 client,
                 &self.collection_name,
-                "uuid",
+                UUID_PAYLOAD_KEY,
                 FieldType::Uuid,
                 UuidIndexParamsBuilder::default()
                     .is_tenant(true)

@@ -12,10 +12,10 @@ use crate::process::ProcessManager;
 use crate::workload::Workload;
 use clap::Parser;
 use env_logger::Target;
-use qdrant_client::{config::QdrantConfig, Qdrant};
+use qdrant_client::{Qdrant, config::QdrantConfig};
 use std::process::exit;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::time::sleep;
 

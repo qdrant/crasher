@@ -1,5 +1,5 @@
 use anyhow::Context as _;
-use futures::{future::BoxFuture, FutureExt as _, TryStreamExt as _};
+use futures::{FutureExt as _, TryStreamExt as _, future::BoxFuture};
 use std::path::PathBuf;
 use tokio::fs;
 
