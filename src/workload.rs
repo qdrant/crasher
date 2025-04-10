@@ -1,12 +1,13 @@
 use anyhow::Result;
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::point_id::PointIdOptions;
+use qdrant_client::qdrant::vector_output::Vector;
 use qdrant_client::qdrant::vectors_output::VectorsOptions;
 use qdrant_client::qdrant::{
     BoolIndexParamsBuilder, Condition, DatetimeIndexParamsBuilder, FieldType, Filter,
     FloatIndexParamsBuilder, GeoIndexParamsBuilder, IntegerIndexParamsBuilder,
-    KeywordIndexParamsBuilder, ScrollPointsBuilder, TextIndexParamsBuilder, TokenizerType,
-    UuidIndexParamsBuilder, WriteOrdering,
+    KeywordIndexParamsBuilder, QueryBatchResponse, ScrollPointsBuilder, TextIndexParamsBuilder,
+    TokenizerType, UuidIndexParamsBuilder, WriteOrdering,
 };
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -46,7 +47,7 @@ impl Workload {
         vec_dim: usize,
     ) -> Self {
         let payload_count = 1;
-        let search_count = 1;
+        let search_count = 2;
         let test_named_vectors = TestNamedVectors::new(duplication_factor, vec_dim);
         let write_ordering = None; // default
         Workload {
@@ -291,15 +292,17 @@ impl Workload {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
             }
-            query_batch_points(
+            let results = query_batch_points(
                 client,
                 &self.collection_name,
                 &self.test_named_vectors,
                 args.only_sparse,
                 self.vec_dim,
                 self.payload_count,
+                true,
             )
             .await?;
+            check_search_result(results)?;
         }
 
         log::info!("Workload finished");
@@ -408,5 +411,40 @@ impl Workload {
         }
 
         Ok(())
+    }
+}
+
+fn check_search_result(results: QueryBatchResponse) -> Result<(), CrasherError> {
+    // assert no vector is only containing zeros
+    for result in &results.result {
+        let contain_zeroed_vector = result
+            .result
+            .iter()
+            .filter_map(|r| r.vectors.as_ref().and_then(|v| v.vectors_options.as_ref()))
+            .any(|vectors| match vectors {
+                VectorsOptions::Vector(v) => vector_is_all_zeroes(&v.vector.clone().unwrap()),
+                VectorsOptions::Vectors(vectors) => vectors
+                    .vectors
+                    .values()
+                    .any(|v| vector_is_all_zeroes(&v.vector.clone().unwrap())),
+            });
+        if contain_zeroed_vector {
+            return Err(Invariant(format!(
+                "Query result contains zeroed vector: {:?}",
+                result
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn vector_is_all_zeroes(vector: &Vector) -> bool {
+    match vector {
+        Vector::Dense(dense) => dense.data.iter().all(|v| *v != 0.0),
+        Vector::Sparse(sparse) => sparse.values.iter().all(|v| *v != 0.0),
+        Vector::MultiDense(multi) => multi
+            .vectors
+            .iter()
+            .all(|v| v.data.iter().all(|v| *v != 0.0)),
     }
 }

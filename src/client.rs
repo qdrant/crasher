@@ -150,6 +150,7 @@ pub async fn query_batch_points(
     only_sparse: bool,
     vec_dim: usize,
     payload_count: usize,
+    with_vector: bool,
 ) -> Result<QueryBatchResponse, anyhow::Error> {
     let request_filter = random_filter(Some(payload_count));
     let mut requests = vec![];
@@ -173,7 +174,7 @@ pub async fn query_batch_points(
             params: None,
             score_threshold: None,
             offset: None,
-            with_vectors: None,
+            with_vectors: Some(with_vector.into()),
             read_consistency: None,
             timeout: None,
             shard_key_selector: None,
@@ -199,7 +200,7 @@ pub async fn query_batch_points(
                 params: None,
                 score_threshold: None,
                 offset: None,
-                with_vectors: None,
+                with_vectors: Some(with_vector.into()),
                 read_consistency: None,
                 timeout: None,
                 shard_key_selector: None,
@@ -226,7 +227,7 @@ pub async fn query_batch_points(
                 params: None,
                 score_threshold: None,
                 offset: None,
-                with_vectors: None,
+                with_vectors: Some(with_vector.into()),
                 read_consistency: None,
                 timeout: None,
                 shard_key_selector: None,
