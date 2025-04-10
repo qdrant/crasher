@@ -500,9 +500,16 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
     if have_any { Some(filter) } else { None }
 }
 
-pub fn random_dense_vector(dim: usize) -> Vec<f32> {
+pub fn random_dense_vector(name: &str, dim: usize) -> Vec<f32> {
     let mut rng = rand::rng();
-    let res: Vec<f32> = (0..dim).map(|_| rng.random_range(-10.0..10.0)).collect();
+    let range = if name.contains("uint8") {
+        // uint8 vectors get mapped to integers. If we use regular range it is very possible we get a
+        // zeroed vector, which we are asserting should not happen
+        1.0..255.0
+    } else {
+        -10.0..10.0
+    };
+    let res: Vec<f32> = (0..dim).map(|_| rng.random_range(range.clone())).collect();
     assert!(
         !res.iter().all(|&x| x == 0.0),
         "Zero vector generated {:?}",

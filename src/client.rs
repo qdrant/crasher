@@ -189,7 +189,7 @@ pub async fn query_batch_points(
     if !only_sparse {
         // dense
         for dense_name in test_named_vectors.dense_vector_names() {
-            let query_vector = VectorInput::new_dense(random_dense_vector(vec_dim));
+            let query_vector = VectorInput::new_dense(random_dense_vector(&dense_name, vec_dim));
             let query_nearest = Query::new_nearest(query_vector);
             let request = QueryPoints {
                 collection_name: collection_name.to_string(),
@@ -214,7 +214,7 @@ pub async fn query_batch_points(
         for multi_dense_name in test_named_vectors.multi_vector_names() {
             let vec_count = rand::rng().random_range(1..5);
             let multi_vector: Vec<_> = (0..vec_count)
-                .map(|_| random_dense_vector(vec_dim))
+                .map(|_| random_dense_vector(&multi_dense_name, vec_dim))
                 .collect();
             let query_vector = VectorInput::new_multi(multi_vector);
             let query_nearest = Query::new_nearest(query_vector);
@@ -358,14 +358,14 @@ pub async fn insert_points_batch(
                 for name in test_named_vectors.dense_vector_names() {
                     vectors_map.insert(
                         name.clone(),
-                        Vector::new_dense(random_dense_vector(vec_dim)),
+                        Vector::new_dense(random_dense_vector(&name, vec_dim)),
                     );
                 }
                 // multi dense
                 for name in test_named_vectors.multi_vector_names() {
                     let vec_count = rand::rng().random_range(1..5);
                     let multi_vector: Vec<Vec<_>> = (0..vec_count)
-                        .map(|_| random_dense_vector(vec_dim))
+                        .map(|_| random_dense_vector(&name, vec_dim))
                         .collect();
                     vectors_map.insert(name.clone(), Vector::new_multi(multi_vector));
                 }
