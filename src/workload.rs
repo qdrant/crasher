@@ -6,7 +6,7 @@ use qdrant_client::qdrant::{
     BoolIndexParamsBuilder, Condition, DatetimeIndexParamsBuilder, FieldType, Filter,
     FloatIndexParamsBuilder, GeoIndexParamsBuilder, IntegerIndexParamsBuilder,
     KeywordIndexParamsBuilder, QueryBatchResponse, ScrollPointsBuilder, TextIndexParamsBuilder,
-    TokenizerType, UuidIndexParamsBuilder, WriteOrdering,
+    TokenizerType, UuidIndexParamsBuilder, VectorOutput, WriteOrdering, vector_output,
 };
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -414,25 +414,46 @@ impl Workload {
     }
 }
 
+/// Checks if this is a zeroed vector.
+fn check_zeroed_vector(vector: &VectorOutput) -> bool {
+    vector
+        .vector
+        .as_ref()
+        .map(|vector| match vector {
+            vector_output::Vector::Dense(dense_vector) => {
+                dense_vector.data.iter().all(|v| *v == 0.0)
+            }
+            vector_output::Vector::Sparse(sparse_vector) => sparse_vector.indices.is_empty(),
+            vector_output::Vector::MultiDense(multi_dense_vector) => multi_dense_vector
+                .vectors
+                .iter()
+                .all(|v| v.data.iter().all(|v| *v == 0.0)),
+        })
+        // else, check the deprecated field
+        .unwrap_or_else(|| vector.data.iter().all(|v| *v == 0.0))
+}
+
 fn check_search_result(results: QueryBatchResponse) -> Result<(), CrasherError> {
     // assert no vector is only containing zeros
-    for result in &results.result {
-        let contain_zeroed_vector = result
-            .result
-            .iter()
-            .filter_map(|r| r.vectors.as_ref().and_then(|v| v.vectors_options.as_ref()))
-            .any(|vectors| match vectors {
-                VectorsOptions::Vector(v) => v.data.iter().all(|v| *v == 0.0),
+    for point in results.result.iter().map(|result| &result.result).flatten() {
+        if let Some(vectors) = point
+            .vectors
+            .as_ref()
+            .and_then(|v| v.vectors_options.as_ref())
+        {
+            let zeroed_vector = match vectors {
+                VectorsOptions::Vector(v) => check_zeroed_vector(v).then_some(("".to_string(), v)),
                 VectorsOptions::Vectors(vectors) => vectors
                     .vectors
-                    .values()
-                    .any(|v| v.data.iter().all(|v| *v == 0.0)),
-            });
-        if contain_zeroed_vector {
-            return Err(Invariant(format!(
-                "Query result contains zeroed vector: {:?}",
-                result
-            )));
+                    .iter()
+                    .find_map(|(name, v)| check_zeroed_vector(v).then_some((name.to_string(), v))),
+            };
+            if let Some((name, vector)) = zeroed_vector {
+                return Err(Invariant(format!(
+                    "Query result contains zeroed vector: \npoint id: {:?}\nzeroed vector name: {}\nzeroed vector: {:?}\n\npoint: {:?}",
+                    point.id, name, vector, point
+                )));
+            }
         }
     }
     Ok(())
