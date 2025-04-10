@@ -502,7 +502,13 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
 
 pub fn random_dense_vector(dim: usize) -> Vec<f32> {
     let mut rng = rand::rng();
-    (0..dim).map(|_| rng.random_range(-1.0..1.0)).collect()
+    let res: Vec<f32> = (0..dim).map(|_| rng.random_range(-1.0..1.0)).collect();
+    assert!(
+        !res.iter().all(|&x| x == 0.0),
+        "Zero vector generated {:?}",
+        res
+    );
+    res
 }
 
 pub fn random_sparse_vector(max_size: usize, sparsity: f64) -> Vec<(u32, f32)> {

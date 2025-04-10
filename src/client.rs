@@ -143,6 +143,7 @@ pub async fn get_points_count(
 }
 
 /// Query points
+#[allow(clippy::too_many_arguments)]
 pub async fn query_batch_points(
     client: &Qdrant,
     collection_name: &str,
@@ -151,6 +152,7 @@ pub async fn query_batch_points(
     vec_dim: usize,
     payload_count: usize,
     with_vector: bool,
+    limit: u64,
 ) -> Result<QueryBatchResponse, anyhow::Error> {
     let request_filter = random_filter(Some(payload_count));
     let mut requests = vec![];
@@ -169,7 +171,7 @@ pub async fn query_batch_points(
             query: Some(query_nearest),
             using: Some(sparse_name),
             filter: request_filter.clone(),
-            limit: Some(100),
+            limit: Some(limit),
             with_payload: Some(true.into()),
             params: None,
             score_threshold: None,
@@ -195,7 +197,7 @@ pub async fn query_batch_points(
                 query: Some(query_nearest),
                 using: Some(dense_name.clone()),
                 filter: request_filter.clone(),
-                limit: Some(100),
+                limit: Some(limit),
                 with_payload: Some(true.into()),
                 params: None,
                 score_threshold: None,
@@ -222,7 +224,7 @@ pub async fn query_batch_points(
                 query: Some(query_nearest),
                 using: Some(multi_dense_name.clone()),
                 filter: request_filter.clone(),
-                limit: Some(100),
+                limit: Some(limit),
                 with_payload: Some(true.into()),
                 params: None,
                 score_threshold: None,

@@ -1,7 +1,6 @@
 use anyhow::Result;
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::point_id::PointIdOptions;
-use qdrant_client::qdrant::vector_output::Vector;
 use qdrant_client::qdrant::vectors_output::VectorsOptions;
 use qdrant_client::qdrant::{
     BoolIndexParamsBuilder, Condition, DatetimeIndexParamsBuilder, FieldType, Filter,
@@ -30,7 +29,7 @@ use crate::generators::{
 pub struct Workload {
     collection_name: String,
     test_named_vectors: TestNamedVectors,
-    search_count: usize,
+    query_count: usize,
     points_count: usize,
     vec_dim: usize,
     payload_count: usize,
@@ -47,13 +46,13 @@ impl Workload {
         vec_dim: usize,
     ) -> Self {
         let payload_count = 1;
-        let search_count = 2;
+        let query_count = 2;
         let test_named_vectors = TestNamedVectors::new(duplication_factor, vec_dim);
         let write_ordering = None; // default
         Workload {
             collection_name: collection_name.to_string(),
             test_named_vectors,
-            search_count,
+            query_count,
             points_count,
             vec_dim,
             payload_count,
@@ -288,7 +287,7 @@ impl Workload {
         }
 
         log::info!("Run: query random vectors");
-        for _i in 0..self.search_count {
+        for _i in 0..self.query_count {
             if self.stopped.load(Ordering::Relaxed) {
                 return Err(Cancelled);
             }
@@ -300,6 +299,7 @@ impl Workload {
                 self.vec_dim,
                 self.payload_count,
                 true,
+                10,
             )
             .await?;
             check_search_result(results)?;
@@ -422,11 +422,11 @@ fn check_search_result(results: QueryBatchResponse) -> Result<(), CrasherError> 
             .iter()
             .filter_map(|r| r.vectors.as_ref().and_then(|v| v.vectors_options.as_ref()))
             .any(|vectors| match vectors {
-                VectorsOptions::Vector(v) => vector_is_all_zeroes(&v.vector.clone().unwrap()),
+                VectorsOptions::Vector(v) => v.data.iter().all(|v| *v == 0.0),
                 VectorsOptions::Vectors(vectors) => vectors
                     .vectors
                     .values()
-                    .any(|v| vector_is_all_zeroes(&v.vector.clone().unwrap())),
+                    .any(|v| v.data.iter().all(|v| *v == 0.0)),
             });
         if contain_zeroed_vector {
             return Err(Invariant(format!(
@@ -436,15 +436,4 @@ fn check_search_result(results: QueryBatchResponse) -> Result<(), CrasherError> 
         }
     }
     Ok(())
-}
-
-fn vector_is_all_zeroes(vector: &Vector) -> bool {
-    match vector {
-        Vector::Dense(dense) => dense.data.iter().all(|v| *v != 0.0),
-        Vector::Sparse(sparse) => sparse.values.iter().all(|v| *v != 0.0),
-        Vector::MultiDense(multi) => multi
-            .vectors
-            .iter()
-            .all(|v| v.data.iter().all(|v| *v != 0.0)),
-    }
 }
