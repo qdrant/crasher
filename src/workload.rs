@@ -435,7 +435,7 @@ fn check_zeroed_vector(vector: &VectorOutput) -> bool {
 
 fn check_search_result(results: QueryBatchResponse) -> Result<(), CrasherError> {
     // assert no vector is only containing zeros
-    for point in results.result.iter().map(|result| &result.result).flatten() {
+    for point in results.result.iter().flat_map(|result| &result.result) {
         if let Some(vectors) = point
             .vectors
             .as_ref()
