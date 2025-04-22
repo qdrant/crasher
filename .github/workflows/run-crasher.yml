@@ -2,7 +2,7 @@ name: Crash
 
 on:
   push:
-    branches: [ "master", "*" ]
+    branches: [ "master" ]
   schedule:
     # every day at 12 CET
     - cron: "0 14 * * *"
