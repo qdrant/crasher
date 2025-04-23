@@ -14,7 +14,7 @@ clap = { version = "4.5.37", features = ["derive"] }
 futures = { version = "0.3.31", default-features = false, features = ["async-await", "std"] }
 tokio = { version = "1.44.2", features = ["full"] }
 tokio-stream = { version = "0.1.17", default-features = false, features = ["fs"] }
-qdrant-client = "1.13.0"
+qdrant-client = "1.14.0"
 ctrlc = "3.4.6"
 log = "0.4.27"
 env_logger = "0.11.8"

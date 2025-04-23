@@ -4,7 +4,7 @@ use qdrant_client::Payload;
 use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::{
-    BinaryQuantization, Distance, FieldCondition, Filter, HnswConfigDiff, Match, MultiVectorConfig,
+    BinaryQuantization, Condition, Distance, Filter, HnswConfigDiff, MultiVectorConfig,
     ProductQuantization, QuantizationConfig, ScalarQuantization, SparseIndexConfig,
     SparseVectorParams, VectorParams,
 };
@@ -478,24 +478,11 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
     let mut have_any = false;
     if let Some(keyword_variants) = keywords {
         have_any = true;
-        filter.must.push(
-            FieldCondition {
-                key: KEYWORD_PAYLOAD_KEY.to_string(),
-                r#match: Some(Match {
-                    match_value: Some(MatchValue::Keyword(random_keyword(
-                        &mut rng,
-                        keyword_variants,
-                    ))),
-                }),
-                range: None,
-                geo_bounding_box: None,
-                geo_radius: None,
-                values_count: None,
-                geo_polygon: None,
-                datetime_range: None,
-            }
-            .into(),
-        )
+
+        filter.must.push(Condition::matches(
+            KEYWORD_PAYLOAD_KEY,
+            MatchValue::Keyword(random_keyword(&mut rng, keyword_variants)),
+        ));
     }
     if have_any { Some(filter) } else { None }
 }
