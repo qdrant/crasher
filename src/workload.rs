@@ -86,7 +86,7 @@ impl Workload {
                 }
                 Err(Client(error)) => {
                     // turn client error into hard error if it is a server error (a bit hacky)
-                    let debug_error = format!("{:?}", error);
+                    let debug_error = format!("{error:?}");
                     if debug_error.contains("Service internal error") {
                         log::error!("Workload run failed due to a server error!\n{error:?}");
                         // send stop signal to the main thread
@@ -350,22 +350,19 @@ impl Workload {
                             match vector {
                                 VectorsOptions::Vector(anonymous) => {
                                     return Err(Invariant(format!(
-                                        "Vector {:?} should be named: {:?}",
-                                        point_id, anonymous
+                                        "Vector {point_id:?} should be named: {anonymous:?}"
                                     )));
                                 }
                                 VectorsOptions::Vectors(named_vectors) => {
                                     if named_vectors.vectors.is_empty() {
                                         return Err(Invariant(format!(
-                                            "Named vector {:?} should not be empty",
-                                            point_id
+                                            "Named vector {point_id:?} should not be empty"
                                         )));
                                     }
                                     for (name, vector) in &named_vectors.vectors {
                                         if vector.data.is_empty() {
                                             return Err(Invariant(format!(
-                                                "Vector {} with id {:?} should not be empty",
-                                                name, point_id
+                                                "Vector {name} with id {point_id:?} should not be empty"
                                             )));
                                         }
                                     }
@@ -374,8 +371,7 @@ impl Workload {
                         }
                     } else {
                         return Err(Invariant(format!(
-                            "Vector {:?} should be present in the response",
-                            point_id
+                            "Vector {point_id:?} should be present in the response"
                         )));
                     }
                 }

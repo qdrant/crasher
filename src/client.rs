@@ -97,8 +97,7 @@ pub async fn get_collection_info(
         .collection_info(collection_name)
         .await
         .context(format!(
-            "Failed to fetch collection info for {}",
-            collection_name
+            "Failed to fetch collection info for {collection_name}"
         ))?
         .result
         .unwrap();
@@ -115,8 +114,7 @@ pub async fn get_info_points_count(
         .collection_info(collection_name)
         .await
         .context(format!(
-            "Failed to fetch points count for {}",
-            collection_name
+            "Failed to fetch points count for {collection_name}"
         ))?
         .result
         .unwrap()
@@ -133,8 +131,7 @@ pub async fn get_points_count(
         .count(CountPointsBuilder::new(collection_name).exact(true))
         .await
         .context(format!(
-            "Failed to run points count for {}",
-            collection_name
+            "Failed to run points count for {collection_name}"
         ))?
         .result
         .unwrap()
@@ -243,8 +240,7 @@ pub async fn query_batch_points(
         .query_batch(QueryBatchPointsBuilder::new(collection_name, requests))
         .await
         .context(format!(
-            "Failed to query batch points on {}",
-            collection_name
+            "Failed to query batch points on {collection_name}"
         ))?;
 
     Ok(response)
@@ -305,7 +301,7 @@ pub async fn create_collection(
     client
         .create_collection(request)
         .await
-        .context(format!("Failed to create collection {}", collection_name))?;
+        .context(format!("Failed to create collection {collection_name}"))?;
     Ok(())
 }
 
@@ -401,8 +397,7 @@ pub async fn insert_points_batch(
             )
             .await
             .context(format!(
-                "Failed to insert {} points (batch {}/{}) into {}",
-                batch_size, batch_id, num_batches, collection_name
+                "Failed to insert {batch_size} points (batch {batch_id}/{num_batches}) into {collection_name}"
             ))?;
     }
     Ok(())
@@ -451,8 +446,7 @@ pub async fn set_payload(
         )
         .await
         .context(format!(
-            "Failed to set payload for {} with payload_count {}",
-            point_id, payload_count
+            "Failed to set payload for {point_id} with payload_count {payload_count}"
         ))?;
 
     if resp.result.unwrap().status != 2 {
@@ -485,7 +479,7 @@ pub async fn retrieve_points(
             .with_payload(true),
         )
         .await
-        .context(format!("Failed to retrieve points on {}", collection_name))?;
+        .context(format!("Failed to retrieve points on {collection_name}"))?;
 
     Ok(response)
 }
@@ -511,8 +505,7 @@ pub async fn delete_points(
         )
         .await
         .context(format!(
-            "Failed to delete {} points for {}",
-            points_count, collection_name
+            "Failed to delete {points_count} points for {collection_name}"
         ))?;
     if resp.result.unwrap().status != 2 {
         Err(anyhow::anyhow!(

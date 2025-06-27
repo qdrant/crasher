@@ -73,7 +73,7 @@ impl TestNamedVectors {
 
         // dense vectors on disk
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", DENSE_VECTOR_NAME_ON_DISK, i);
+            let name = format!("{DENSE_VECTOR_NAME_ON_DISK}-{i}");
             dense_vectors.insert(
                 name,
                 VectorParams {
@@ -90,7 +90,7 @@ impl TestNamedVectors {
 
         // dense vector rocksdb
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", DENSE_VECTOR_NAME_ROCKSDB, i);
+            let name = format!("{DENSE_VECTOR_NAME_ROCKSDB}-{i}");
             dense_vectors.insert(
                 name,
                 VectorParams {
@@ -107,7 +107,7 @@ impl TestNamedVectors {
 
         // dense vectors uint8
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", DENSE_VECTOR_NAME_UINT8, i);
+            let name = format!("{DENSE_VECTOR_NAME_UINT8}-{i}");
             dense_vectors.insert(
                 name,
                 VectorParams {
@@ -124,7 +124,7 @@ impl TestNamedVectors {
 
         // dense vectors float16
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", DENSE_VECTOR_NAME_FLOAT16, i);
+            let name = format!("{DENSE_VECTOR_NAME_FLOAT16}-{i}");
             dense_vectors.insert(
                 name,
                 VectorParams {
@@ -141,7 +141,7 @@ impl TestNamedVectors {
 
         // dense vectors SQ
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", DENSE_VECTOR_NAME_SQ, i);
+            let name = format!("{DENSE_VECTOR_NAME_SQ}-{i}");
             dense_vectors.insert(
                 name,
                 VectorParams {
@@ -164,7 +164,7 @@ impl TestNamedVectors {
 
         // dense vectors PQ
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", DENSE_VECTOR_NAME_PQ, i);
+            let name = format!("{DENSE_VECTOR_NAME_PQ}-{i}");
             dense_vectors.insert(
                 name,
                 VectorParams {
@@ -186,7 +186,7 @@ impl TestNamedVectors {
 
         // dense vectors BQ
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", DENSE_VECTOR_NAME_BQ, i);
+            let name = format!("{DENSE_VECTOR_NAME_BQ}-{i}");
             dense_vectors.insert(
                 name,
                 VectorParams {
@@ -207,7 +207,7 @@ impl TestNamedVectors {
 
         // sparse vector index on disk
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", SPARSE_VECTOR_NAME_INDEX_DISK, i);
+            let name = format!("{SPARSE_VECTOR_NAME_INDEX_DISK}-{i}");
             sparse_vectors.insert(
                 name.clone(),
                 SparseVectorParams {
@@ -223,7 +223,7 @@ impl TestNamedVectors {
 
         // sparse vector index in memory
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", SPARSE_VECTOR_NAME_INDEX_MEMORY, i);
+            let name = format!("{SPARSE_VECTOR_NAME_INDEX_MEMORY}-{i}");
             sparse_vectors.insert(
                 name.clone(),
                 SparseVectorParams {
@@ -239,7 +239,7 @@ impl TestNamedVectors {
 
         // sparse vector uint8
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", SPARSE_VECTOR_NAME_UINT8, i);
+            let name = format!("{SPARSE_VECTOR_NAME_UINT8}-{i}");
             sparse_vectors.insert(
                 name.clone(),
                 SparseVectorParams {
@@ -255,7 +255,7 @@ impl TestNamedVectors {
 
         // sparse vector float16
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", SPARSE_VECTOR_NAME_FLOAT16, i);
+            let name = format!("{SPARSE_VECTOR_NAME_FLOAT16}-{i}");
             sparse_vectors.insert(
                 name.clone(),
                 SparseVectorParams {
@@ -272,7 +272,7 @@ impl TestNamedVectors {
         let multivector_config = Some(MultiVectorConfig { comparator: 0 });
         // multi vector on disk
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", MULTI_VECTOR_NAME_ON_DISK, i);
+            let name = format!("{MULTI_VECTOR_NAME_ON_DISK}-{i}");
             multi_vectors.insert(
                 name,
                 VectorParams {
@@ -289,7 +289,7 @@ impl TestNamedVectors {
 
         // multi vector rocksdb
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", MULTI_VECTOR_NAME_ROCKSDB, i);
+            let name = format!("{MULTI_VECTOR_NAME_ROCKSDB}-{i}");
             multi_vectors.insert(
                 name,
                 VectorParams {
@@ -306,7 +306,7 @@ impl TestNamedVectors {
 
         // multi vector uint8
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", MULTI_VECTOR_NAME_UINT8, i);
+            let name = format!("{MULTI_VECTOR_NAME_UINT8}-{i}");
             multi_vectors.insert(
                 name,
                 VectorParams {
@@ -323,7 +323,7 @@ impl TestNamedVectors {
 
         // multi vector float16
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", MULTI_VECTOR_NAME_FLOAT16, i);
+            let name = format!("{MULTI_VECTOR_NAME_FLOAT16}-{i}");
             multi_vectors.insert(
                 name,
                 VectorParams {
@@ -340,7 +340,7 @@ impl TestNamedVectors {
 
         // multi vectors SQ
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", MULTI_VECTOR_NAME_SQ, i);
+            let name = format!("{MULTI_VECTOR_NAME_SQ}-{i}");
             multi_vectors.insert(
                 name,
                 VectorParams {
@@ -363,7 +363,7 @@ impl TestNamedVectors {
 
         // multi vectors PQ
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", MULTI_VECTOR_NAME_PQ, i);
+            let name = format!("{MULTI_VECTOR_NAME_PQ}-{i}");
             multi_vectors.insert(
                 name,
                 VectorParams {
@@ -385,7 +385,7 @@ impl TestNamedVectors {
 
         // multi vectors BQ
         for i in 1..=duplication_factor {
-            let name = format!("{}-{}", MULTI_VECTOR_NAME_BQ, i);
+            let name = format!("{MULTI_VECTOR_NAME_BQ}-{i}");
             multi_vectors.insert(
                 name,
                 VectorParams {
@@ -438,7 +438,7 @@ impl TestNamedVectors {
 
 pub fn random_keyword(rng: &mut impl Rng, num_variants: usize) -> String {
     let variant = rng.random_range(0..num_variants);
-    format!("keyword_{}", variant)
+    format!("keyword_{variant}")
 }
 
 pub fn random_payload(keywords: Option<usize>) -> Payload {
@@ -499,8 +499,7 @@ pub fn random_dense_vector(name: &str, dim: usize) -> Vec<f32> {
     let res: Vec<f32> = (0..dim).map(|_| rng.random_range(range.clone())).collect();
     assert!(
         !res.iter().all(|&x| x == 0.0),
-        "Zero vector generated {:?}",
-        res
+        "Zero vector generated {res:?}"
     );
     res
 }
