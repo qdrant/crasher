@@ -130,9 +130,7 @@ pub async fn get_points_count(
     let point_count = client
         .count(CountPointsBuilder::new(collection_name).exact(true))
         .await
-        .context(format!(
-            "Failed to run points count for {collection_name}"
-        ))?
+        .context(format!("Failed to run points count for {collection_name}"))?
         .result
         .unwrap()
         .count;
@@ -239,9 +237,7 @@ pub async fn query_batch_points(
     let response = client
         .query_batch(QueryBatchPointsBuilder::new(collection_name, requests))
         .await
-        .context(format!(
-            "Failed to query batch points on {collection_name}"
-        ))?;
+        .context(format!("Failed to query batch points on {collection_name}"))?;
 
     Ok(response)
 }

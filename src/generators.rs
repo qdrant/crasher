@@ -195,6 +195,8 @@ impl TestNamedVectors {
                     quantization_config: Some(QuantizationConfig {
                         quantization: Some(Quantization::Binary(BinaryQuantization {
                             always_ram: Some(false),
+                            encoding: Some(2),
+                            query_encoding: None,
                         })),
                     }),
                     hnsw_config,
@@ -394,6 +396,8 @@ impl TestNamedVectors {
                     quantization_config: Some(QuantizationConfig {
                         quantization: Some(Quantization::Binary(BinaryQuantization {
                             always_ram: Some(false),
+                            encoding: Some(1),
+                            query_encoding: None,
                         })),
                     }),
                     hnsw_config,
