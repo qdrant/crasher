@@ -170,7 +170,7 @@ impl Workload {
                 TEXT_PAYLOAD_KEY,
                 FieldType::Text,
                 TextIndexParamsBuilder::new(TokenizerType::Word)
-                    .phrase_matching(true)
+                    //.phrase_matching(true)
                     .on_disk(true),
             )
             .await?;
