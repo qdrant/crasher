@@ -4,9 +4,9 @@ use qdrant_client::Payload;
 use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::{
-    BinaryQuantizationBuilder, Condition, Distance, Filter, HnswConfigDiff, MultiVectorConfig,
-    ProductQuantization, QuantizationConfig, ScalarQuantization, SparseIndexConfig,
-    SparseVectorParams, VectorParams,
+    BinaryQuantizationBuilder, BinaryQuantizationEncoding, Condition, Distance, Filter,
+    HnswConfigDiff, MultiVectorConfig, ProductQuantization, QuantizationConfig, ScalarQuantization,
+    SparseIndexConfig, SparseVectorParams, VectorParams,
 };
 use rand::Rng;
 use serde_json::json;
@@ -188,7 +188,8 @@ impl TestNamedVectors {
         for i in 1..=duplication_factor {
             let name = format!("{DENSE_VECTOR_NAME_BQ}-{i}");
 
-            let bq_builder = BinaryQuantizationBuilder::new(false);
+            let bq_builder =
+                BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::TwoBits);
 
             dense_vectors.insert(
                 name,
@@ -387,7 +388,8 @@ impl TestNamedVectors {
         // multi vectors BQ
         for i in 1..=duplication_factor {
             let name = format!("{MULTI_VECTOR_NAME_BQ}-{i}");
-            let bq_builder = BinaryQuantizationBuilder::new(false);
+            let bq_builder =
+                BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::TwoBits);
             multi_vectors.insert(
                 name,
                 VectorParams {
