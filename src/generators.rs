@@ -4,7 +4,7 @@ use qdrant_client::Payload;
 use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::{
-    BinaryQuantization, Condition, Distance, Filter, HnswConfigDiff, MultiVectorConfig,
+    BinaryQuantizationBuilder, Condition, Distance, Filter, HnswConfigDiff, MultiVectorConfig,
     ProductQuantization, QuantizationConfig, ScalarQuantization, SparseIndexConfig,
     SparseVectorParams, VectorParams,
 };
@@ -187,17 +187,16 @@ impl TestNamedVectors {
         // dense vectors BQ
         for i in 1..=duplication_factor {
             let name = format!("{DENSE_VECTOR_NAME_BQ}-{i}");
+
+            let bq_builder = BinaryQuantizationBuilder::new(false);
+
             dense_vectors.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(),
                     quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Binary(BinaryQuantization {
-                            always_ram: Some(false),
-                            //encoding: Some(2),
-                            //query_encoding: None,
-                        })),
+                        quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
                     on_disk: Some(true), // on disk
@@ -388,17 +387,14 @@ impl TestNamedVectors {
         // multi vectors BQ
         for i in 1..=duplication_factor {
             let name = format!("{MULTI_VECTOR_NAME_BQ}-{i}");
+            let bq_builder = BinaryQuantizationBuilder::new(false);
             multi_vectors.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
                     distance: Distance::Dot.into(),
                     quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Binary(BinaryQuantization {
-                            always_ram: Some(false),
-                            //encoding: Some(1),
-                            //query_encoding: None,
-                        })),
+                        quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
                     on_disk: Some(true), // on disk
