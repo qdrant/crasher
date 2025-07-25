@@ -38,7 +38,9 @@ pub const MULTI_VECTOR_NAME_PQ: &str = "multi-dense-vector-pq";
 pub const MULTI_VECTOR_NAME_BQ: &str = "multi-dense-vector-bq";
 
 /// Payload keys
-pub const MISSING_PAYLOAD_TIMESTAMP_KEY: &str = "missing-payload-timestamp";
+pub const MANDATORY_PAYLOAD_TIMESTAMP_KEY: &str = "mandatory-payload-timestamp";
+// TODO add one mandatory key per index type
+
 pub const KEYWORD_PAYLOAD_KEY: &str = "crasher-payload-keyword";
 pub const INTEGER_PAYLOAD_KEY: &str = "crasher-payload-integer";
 pub const FLOAT_PAYLOAD_KEY: &str = "crasher-payload-float";

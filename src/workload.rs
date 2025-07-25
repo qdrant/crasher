@@ -22,7 +22,7 @@ use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
 use crate::generators::{
     BOOL_PAYLOAD_KEY, DATETIME_PAYLOAD_KEY, FLOAT_PAYLOAD_KEY, GEO_PAYLOAD_KEY,
-    INTEGER_PAYLOAD_KEY, KEYWORD_PAYLOAD_KEY, MISSING_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY,
+    INTEGER_PAYLOAD_KEY, KEYWORD_PAYLOAD_KEY, MANDATORY_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY,
     TestNamedVectors, UUID_PAYLOAD_KEY,
 };
 
@@ -213,7 +213,7 @@ impl Workload {
                 create_field_index(
                     client,
                     &self.collection_name,
-                    MISSING_PAYLOAD_TIMESTAMP_KEY,
+                    MANDATORY_PAYLOAD_TIMESTAMP_KEY,
                     FieldType::Datetime,
                     DatetimeIndexParamsBuilder::default()
                         .is_principal(true)
@@ -260,6 +260,11 @@ impl Workload {
         )
         .await?;
 
+        if args.missing_payload_check {
+            log::info!("Run: post-point-insert payload data consistency check");
+            self.missing_payload_check(client).await?;
+        }
+
         log::info!("Run: point count");
         let points_count = get_points_count(client, &self.collection_name).await?;
         if points_count != self.points_count {
@@ -286,6 +291,11 @@ impl Workload {
                 self.write_ordering,
             )
             .await?;
+        }
+
+        if args.missing_payload_check {
+            log::info!("Run: post-payload-insert payload data consistency check");
+            self.missing_payload_check(client).await?;
         }
 
         log::info!("Run: query random vectors");
@@ -383,11 +393,15 @@ impl Workload {
     }
 
     async fn missing_payload_check(&self, client: &Qdrant) -> Result<(), CrasherError> {
+        // TODO check present in storage with scroll by ids
+        // TODO check present in typed index with match query
+
+        // Check NullIndex
         let resp = client
             .scroll(
                 ScrollPointsBuilder::new(&self.collection_name)
                     .filter(Filter::must([Condition::is_empty(
-                        MISSING_PAYLOAD_TIMESTAMP_KEY,
+                        MANDATORY_PAYLOAD_TIMESTAMP_KEY,
                     )]))
                     .limit(self.points_count.try_into().unwrap()),
             )
@@ -403,7 +417,7 @@ impl Workload {
             return Err(Invariant(format!(
                 "Detected {} points missing the '{}' payload key!\n{:?}",
                 points.len(),
-                MISSING_PAYLOAD_TIMESTAMP_KEY,
+                MANDATORY_PAYLOAD_TIMESTAMP_KEY,
                 points,
             )));
         }

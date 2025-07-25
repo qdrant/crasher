@@ -3,7 +3,7 @@ use crate::args::Args;
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::Cancelled;
 use crate::generators::{
-    MISSING_PAYLOAD_TIMESTAMP_KEY, TestNamedVectors, random_dense_vector, random_filter,
+    MANDATORY_PAYLOAD_TIMESTAMP_KEY, TestNamedVectors, random_dense_vector, random_filter,
     random_payload, random_sparse_vector,
 };
 use anyhow::Context;
@@ -374,7 +374,7 @@ pub async fn insert_points_batch(
 
             if timestamp_payload {
                 payload.insert(
-                    MISSING_PAYLOAD_TIMESTAMP_KEY,
+                    MANDATORY_PAYLOAD_TIMESTAMP_KEY,
                     chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
                 );
             }
