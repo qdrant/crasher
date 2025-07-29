@@ -22,8 +22,8 @@ use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
 use crate::generators::{
     BOOL_PAYLOAD_KEY, DATETIME_PAYLOAD_KEY, FLOAT_PAYLOAD_KEY, GEO_PAYLOAD_KEY,
-    INTEGER_PAYLOAD_KEY, KEYWORD_PAYLOAD_KEY, MANDATORY_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY,
-    TestNamedVectors, UUID_PAYLOAD_KEY,
+    INTEGER_PAYLOAD_KEY, KEYWORD_PAYLOAD_KEY, MANDATORY_PAYLOAD_BOOL_KEY,
+    MANDATORY_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY, TestNamedVectors, UUID_PAYLOAD_KEY,
 };
 
 pub struct Workload {
@@ -220,6 +220,14 @@ impl Workload {
                         .on_disk(true),
                 )
                 .await?;
+                create_field_index(
+                    client,
+                    &self.collection_name,
+                    MANDATORY_PAYLOAD_BOOL_KEY,
+                    FieldType::Bool,
+                    BoolIndexParamsBuilder::default().on_disk(true),
+                )
+                .await?;
             }
 
             let collection_info = get_collection_info(client, &self.collection_name).await?;
@@ -238,7 +246,7 @@ impl Workload {
 
             if args.missing_payload_check {
                 log::info!("Run: pre payload data consistency check");
-                self.missing_payload_check(client).await?;
+                self.mandatory_payload_check(client).await?;
             }
 
             log::info!("Run: delete existing points ({current_count})");
@@ -262,7 +270,7 @@ impl Workload {
 
         if args.missing_payload_check {
             log::info!("Run: post-point-insert payload data consistency check");
-            self.missing_payload_check(client).await?;
+            self.mandatory_payload_check(client).await?;
         }
 
         log::info!("Run: point count");
@@ -295,7 +303,7 @@ impl Workload {
 
         if args.missing_payload_check {
             log::info!("Run: post-payload-insert payload data consistency check");
-            self.missing_payload_check(client).await?;
+            self.mandatory_payload_check(client).await?;
         }
 
         log::info!("Run: query random vectors");
@@ -392,11 +400,17 @@ impl Workload {
         Ok(())
     }
 
-    async fn missing_payload_check(&self, client: &Qdrant) -> Result<(), CrasherError> {
+    async fn mandatory_payload_check(&self, client: &Qdrant) -> Result<(), CrasherError> {
         // TODO check present in storage with scroll by ids
         // TODO check present in typed index with match query
 
-        // Check NullIndex
+        self.check_null_index(client).await?;
+        self.check_bool_index(client).await?;
+
+        Ok(())
+    }
+
+    async fn check_null_index(&self, client: &Qdrant) -> Result<(), CrasherError> {
         let resp = client
             .scroll(
                 ScrollPointsBuilder::new(&self.collection_name)
@@ -406,23 +420,59 @@ impl Workload {
                     .limit(self.points_count.try_into().unwrap()),
             )
             .await?;
-
         let points: Vec<_> = resp
             .result
             .into_iter()
             .map(|point| point.id.and_then(|pid| pid.point_id_options))
             .collect();
-
-        if !points.is_empty() {
+        Ok(if !points.is_empty() {
             return Err(Invariant(format!(
                 "Detected {} points missing the '{}' payload key!\n{:?}",
                 points.len(),
                 MANDATORY_PAYLOAD_TIMESTAMP_KEY,
                 points,
             )));
-        }
+        })
+    }
 
-        Ok(())
+    async fn check_bool_index(&self, client: &Qdrant) -> Result<(), CrasherError> {
+        let current_count = get_points_count(client, &self.collection_name).await?;
+
+        let resp = client
+            .scroll(
+                ScrollPointsBuilder::new(&self.collection_name)
+                    .filter(Filter::must([Condition::matches(
+                        MANDATORY_PAYLOAD_BOOL_KEY,
+                        true,
+                    )]))
+                    .limit(self.points_count.try_into().unwrap()),
+            )
+            .await?;
+        let points: HashSet<_> = resp
+            .result
+            .into_iter()
+            .filter_map(|point| {
+                point.id.and_then(|pid| {
+                    pid.point_id_options.and_then(|options| match options {
+                        PointIdOptions::Num(id) => Some(id),
+                        PointIdOptions::Uuid(_) => None,
+                    })
+                })
+            }).collect();
+
+        let missing_points: Vec<_> = (0..current_count as u64)
+            .filter(|id| !points.contains(id))
+            .collect();
+
+        Ok(if !missing_points.is_empty() {
+            return Err(Invariant(format!(
+                "Out of {}, detected {} points missing the '{}: true' payload!\n{:?}",
+                current_count,
+                missing_points.len(),
+                MANDATORY_PAYLOAD_BOOL_KEY,
+                missing_points,
+            )));
+        })
     }
 }
 
