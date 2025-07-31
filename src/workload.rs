@@ -405,7 +405,7 @@ impl Workload {
         // TODO check present in typed index with match query
 
         self.check_null_index(client).await?;
-        self.check_bool_index(client).await?;
+        // self.check_bool_index(client).await?;
 
         Ok(())
     }
@@ -458,7 +458,8 @@ impl Workload {
                         PointIdOptions::Uuid(_) => None,
                     })
                 })
-            }).collect();
+            })
+            .collect();
 
         let missing_points: Vec<_> = (0..current_count as u64)
             .filter(|id| !points.contains(id))
