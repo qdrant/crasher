@@ -3,7 +3,8 @@ use crate::args::Args;
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::Cancelled;
 use crate::generators::{
-    random_dense_vector, random_filter, random_payload, random_sparse_vector, TestNamedVectors, MANDATORY_PAYLOAD_BOOL_KEY, MANDATORY_PAYLOAD_TIMESTAMP_KEY
+    MANDATORY_PAYLOAD_BOOL_KEY, MANDATORY_PAYLOAD_TIMESTAMP_KEY, TestNamedVectors,
+    random_dense_vector, random_filter, random_payload, random_sparse_vector,
 };
 use anyhow::Context;
 use qdrant_client::Qdrant;

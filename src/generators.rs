@@ -449,25 +449,25 @@ pub fn random_keyword(rng: &mut impl Rng, num_variants: usize) -> String {
 pub fn random_payload(keywords: Option<usize>) -> Payload {
     let mut payload = Payload::new();
     let mut rng = rand::rng();
-    if let Some(keyword_variants) = keywords {
-        if keyword_variants > 0 {
-            payload.insert(
-                KEYWORD_PAYLOAD_KEY,
-                random_keyword(&mut rng, keyword_variants),
-            );
-            payload.insert(INTEGER_PAYLOAD_KEY, rng.random_range(0..100));
-            payload.insert(FLOAT_PAYLOAD_KEY, rng.random_range(0.0..100.0));
-            // create geo payload with random coordinates
-            let geo_value = json!({
-                "lat": rng.random_range(-90.0..90.0),
-                "lon": rng.random_range(-180.0..180.0),
-            });
-            payload.insert(GEO_PAYLOAD_KEY, geo_value);
-            payload.insert(TEXT_PAYLOAD_KEY, random_keyword(&mut rng, keyword_variants));
-            payload.insert(BOOL_PAYLOAD_KEY, rng.random_bool(0.5));
-            payload.insert(DATETIME_PAYLOAD_KEY, chrono::Utc::now().to_rfc3339());
-            payload.insert(UUID_PAYLOAD_KEY, uuid::Uuid::new_v4().to_string());
-        }
+    if let Some(keyword_variants) = keywords
+        && keyword_variants > 0
+    {
+        payload.insert(
+            KEYWORD_PAYLOAD_KEY,
+            random_keyword(&mut rng, keyword_variants),
+        );
+        payload.insert(INTEGER_PAYLOAD_KEY, rng.random_range(0..100));
+        payload.insert(FLOAT_PAYLOAD_KEY, rng.random_range(0.0..100.0));
+        // create geo payload with random coordinates
+        let geo_value = json!({
+            "lat": rng.random_range(-90.0..90.0),
+            "lon": rng.random_range(-180.0..180.0),
+        });
+        payload.insert(GEO_PAYLOAD_KEY, geo_value);
+        payload.insert(TEXT_PAYLOAD_KEY, random_keyword(&mut rng, keyword_variants));
+        payload.insert(BOOL_PAYLOAD_KEY, rng.random_bool(0.5));
+        payload.insert(DATETIME_PAYLOAD_KEY, chrono::Utc::now().to_rfc3339());
+        payload.insert(UUID_PAYLOAD_KEY, uuid::Uuid::new_v4().to_string());
     }
     payload
 }

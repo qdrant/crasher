@@ -425,14 +425,17 @@ impl Workload {
             .into_iter()
             .map(|point| point.id.and_then(|pid| pid.point_id_options))
             .collect();
-        Ok(if !points.is_empty() {
-            return Err(Invariant(format!(
+
+        if points.is_empty() {
+            Ok(())
+        } else {
+            Err(Invariant(format!(
                 "Detected {} points missing the '{}' payload key!\n{:?}",
                 points.len(),
                 MANDATORY_PAYLOAD_TIMESTAMP_KEY,
                 points,
-            )));
-        })
+            )))
+        }
     }
 
     async fn check_bool_index(&self, client: &Qdrant) -> Result<(), CrasherError> {
@@ -458,21 +461,24 @@ impl Workload {
                         PointIdOptions::Uuid(_) => None,
                     })
                 })
-            }).collect();
+            })
+            .collect();
 
         let missing_points: Vec<_> = (0..current_count as u64)
             .filter(|id| !points.contains(id))
             .collect();
 
-        Ok(if !missing_points.is_empty() {
-            return Err(Invariant(format!(
+        if missing_points.is_empty() {
+            Ok(())
+        } else {
+            Err(Invariant(format!(
                 "Out of {}, detected {} points missing the '{}: true' payload!\n{:?}",
                 current_count,
                 missing_points.len(),
                 MANDATORY_PAYLOAD_BOOL_KEY,
                 missing_points,
-            )));
-        })
+            )))
+        }
     }
 }
 
