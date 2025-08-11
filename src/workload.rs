@@ -249,7 +249,7 @@ impl Workload {
 
             if args.missing_payload_check {
                 log::info!("Run: pre payload data consistency check");
-                self.mandatory_payload_check(client).await?;
+                self.data_consistency_check(client).await?;
             }
 
             log::info!("Run: delete existing points ({current_count})");
@@ -282,7 +282,7 @@ impl Workload {
 
         if args.missing_payload_check {
             log::info!("Run: post-point-insert payload data consistency check");
-            self.mandatory_payload_check(client).await?;
+            self.data_consistency_check(client).await?;
         }
 
         log::info!("Run: point count");
@@ -315,7 +315,7 @@ impl Workload {
 
         if args.missing_payload_check {
             log::info!("Run: post-payload-insert payload data consistency check");
-            self.mandatory_payload_check(client).await?;
+            self.data_consistency_check(client).await?;
         }
 
         log::info!("Run: query random vectors");
@@ -415,14 +415,49 @@ impl Workload {
         Ok(())
     }
 
-    async fn mandatory_payload_check(&self, client: &Qdrant) -> Result<(), CrasherError> {
-        // TODO check present in storage with scroll by ids
-        // TODO check present in typed index with match query
-
+    async fn data_consistency_check(&self, client: &Qdrant) -> Result<(), CrasherError> {
+        // check all points present in storage
+        self.check_no_missing_point(client).await?;
+        // check mandatory payload key via null index
         self.check_null_index(client).await?;
+        // check mandatory payload key via match query
         self.check_bool_index(client).await?;
 
         Ok(())
+    }
+
+    async fn check_no_missing_point(&self, client: &Qdrant) -> Result<(), CrasherError> {
+        let current_count = get_points_count(client, &self.collection_name).await?;
+        let resp = client
+            .scroll(ScrollPointsBuilder::new(&self.collection_name).limit(current_count as u32))
+            .await?;
+        let points: HashSet<_> = resp
+            .result
+            .into_iter()
+            .filter_map(|point| {
+                point.id.and_then(|pid| {
+                    pid.point_id_options.and_then(|options| match options {
+                        PointIdOptions::Num(id) => Some(id),
+                        PointIdOptions::Uuid(_) => None,
+                    })
+                })
+            })
+            .collect();
+
+        let missing_points: Vec<_> = (0..current_count as u64)
+            .filter(|id| !points.contains(id))
+            .collect();
+
+        if missing_points.is_empty() {
+            Ok(())
+        } else {
+            Err(Invariant(format!(
+                "Out of {}, detected {} points missing!\n{:?}",
+                current_count,
+                missing_points.len(),
+                missing_points,
+            )))
+        }
     }
 
     async fn check_null_index(&self, client: &Qdrant) -> Result<(), CrasherError> {
