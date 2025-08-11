@@ -124,7 +124,7 @@ pub async fn get_info_points_count(
 }
 
 /// Get points count
-pub async fn get_points_count(
+pub async fn get_exact_points_count(
     client: &Qdrant,
     collection_name: &str,
 ) -> Result<usize, anyhow::Error> {
@@ -458,7 +458,7 @@ pub async fn set_payload(
     }
 }
 
-/// Retrieve points
+/// Retrieve points with vectors and payload
 pub async fn retrieve_points(
     client: &Qdrant,
     collection_name: &str,

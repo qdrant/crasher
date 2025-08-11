@@ -18,7 +18,6 @@ CRASHER_CMD=(
     ${QDRANT_BACKUP_DIRS[@]/#/--backup-working-dir } # this does not handle spaces 😬
     --exec-path "$QDRANT_EXEC"
     --crash-probability "$CRASH_PROBABILITY"
-    --missing-payload-check
 )
 
 echo "${CRASHER_CMD[*]}"

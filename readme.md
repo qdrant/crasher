@@ -51,10 +51,6 @@ Options:
           Whether to only upsert sparse vectors
       --duplication-factor <DUPLICATION_FACTOR>
           Duplication factor for generating additional named vectors [default: 2]
-      --consistency-check
-          Whether to perform extra consistency check
-      --missing-payload-check
-          Enable additional check that all points contain payload
   -h, --help
           Print help
   -V, --version

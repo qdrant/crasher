@@ -19,7 +19,7 @@ use crate::args::Args;
 use crate::client::{
     count_collection_snapshots, create_collection, create_collection_snapshot, create_field_index,
     delete_all_collection_snapshot, delete_collection_snapshot, delete_points, get_collection_info,
-    get_points_count, insert_points_batch, query_batch_points, retrieve_points, set_payload,
+    get_exact_points_count, insert_points_batch, query_batch_points, retrieve_points, set_payload,
 };
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
@@ -212,51 +212,42 @@ impl Workload {
             )
             .await?;
 
-            if args.missing_payload_check {
-                create_field_index(
-                    client,
-                    &self.collection_name,
-                    MANDATORY_PAYLOAD_TIMESTAMP_KEY,
-                    FieldType::Datetime,
-                    DatetimeIndexParamsBuilder::default()
-                        .is_principal(true)
-                        .on_disk(true),
-                )
-                .await?;
-                create_field_index(
-                    client,
-                    &self.collection_name,
-                    MANDATORY_PAYLOAD_BOOL_KEY,
-                    FieldType::Bool,
-                    BoolIndexParamsBuilder::default().on_disk(true),
-                )
-                .await?;
-            }
+            // mandatory payload field indices
+            create_field_index(
+                client,
+                &self.collection_name,
+                MANDATORY_PAYLOAD_TIMESTAMP_KEY,
+                FieldType::Datetime,
+                DatetimeIndexParamsBuilder::default()
+                    .is_principal(true)
+                    .on_disk(true),
+            )
+            .await?;
+            create_field_index(
+                client,
+                &self.collection_name,
+                MANDATORY_PAYLOAD_BOOL_KEY,
+                FieldType::Bool,
+                BoolIndexParamsBuilder::default().on_disk(true),
+            )
+            .await?;
 
             let collection_info = get_collection_info(client, &self.collection_name).await?;
             log::info!("Collection info: {collection_info:#?}");
         }
 
-        let current_count = get_points_count(client, &self.collection_name).await?;
+        // Validate and clean up existing data
+        let current_count = get_exact_points_count(client, &self.collection_name).await?;
         if current_count != 0 {
-            if args.consistency_check {
-                // can be disabled if qdrant is running internal data consistency check on the server side
-                // `cargo run --features data-consistency-check`
-                log::info!("Run: pre vector data consistency check ({current_count})");
-                self.vector_data_consistency_check(client, current_count)
-                    .await?;
-            }
+            log::info!("Run: previous data consistency check ({current_count} points)");
+            self.data_consistency_check(client, current_count).await?;
 
-            if args.missing_payload_check {
-                log::info!("Run: pre payload data consistency check");
-                self.data_consistency_check(client).await?;
-            }
-
-            log::info!("Run: delete existing points ({current_count})");
+            log::info!("Run: delete existing points ({current_count} points)");
             delete_points(client, &self.collection_name, current_count).await?;
+
             let snapshots_count = count_collection_snapshots(client, &self.collection_name).await?;
             if snapshots_count > 0 {
-                log::info!("Run: delete existing snapshots ({snapshots_count})");
+                log::info!("Run: delete existing snapshots ({snapshots_count} snapshots)");
                 // TODO restore existing snapshot and check those are consistent
                 delete_all_collection_snapshot(client, &self.collection_name).await?;
             }
@@ -271,8 +262,8 @@ impl Workload {
             &self.collection_name,
             self.points_count,
             self.vec_dim,
-            0,                          // no payload at first
-            args.missing_payload_check, // add timestamp payload for the missing payload check
+            0,    // no payload at first
+            true, // add payload keys
             args.only_sparse,
             &self.test_named_vectors,
             None,
@@ -280,19 +271,9 @@ impl Workload {
         )
         .await?;
 
-        if args.missing_payload_check {
-            log::info!("Run: post-point-insert payload data consistency check");
-            self.data_consistency_check(client).await?;
-        }
-
-        log::info!("Run: point count");
-        let points_count = get_points_count(client, &self.collection_name).await?;
-        if points_count != self.points_count {
-            return Err(Invariant(format!(
-                "Collection has wrong number of points after insert {} vs {}",
-                points_count, self.points_count
-            )));
-        }
+        let points_count = get_exact_points_count(client, &self.collection_name).await?;
+        log::info!("Run: post-point-insert data consistency check");
+        self.data_consistency_check(client, points_count).await?;
 
         log::info!("Run: set payload");
         for point_id in 1..self.points_count {
@@ -313,10 +294,8 @@ impl Workload {
             .await?;
         }
 
-        if args.missing_payload_check {
-            log::info!("Run: post-payload-insert payload data consistency check");
-            self.data_consistency_check(client).await?;
-        }
+        log::info!("Run: post-payload-insert data consistency check");
+        self.data_consistency_check(client, points_count).await?;
 
         log::info!("Run: query random vectors");
         for _i in 0..self.query_count {
@@ -345,17 +324,17 @@ impl Workload {
     }
 
     /// Vector data consistency checker for id range
-    async fn vector_data_consistency_check(
+    async fn check_points_consistency(
         &self,
         client: &Qdrant,
-        points_count: usize,
+        current_count: usize,
     ) -> Result<(), CrasherError> {
         // fetch all existing points (rely on numeric ids!)
-        let all_ids: Vec<_> = (1..points_count).collect();
+        let all_ids: Vec<_> = (1..current_count).collect();
         // by batches to not overload the server
-        for ids in all_ids.chunks(100) {
+        for ids in all_ids.chunks(current_count.min(1000)) {
             let response = retrieve_points(client, &self.collection_name, ids).await?;
-            // assert all there empty
+            // check if missing points
             if response.result.len() != ids.len() {
                 let response_ids = response
                     .result
@@ -372,14 +351,15 @@ impl Workload {
                     .filter(|&id| !response_ids.contains(id))
                     .collect::<Vec<_>>();
                 return Err(Invariant(format!(
-                    "Retrieve did not return all result {}/{}\nMissing ids: {:?}",
-                    response.result.len(),
-                    ids.len(),
+                    "{} missing points detected\n{:?}",
+                    missing_ids.len(),
                     missing_ids
                 )));
             } else {
+                // check points are welformed
                 for point in &response.result {
                     let point_id = point.id.as_ref().expect("Point id should be present");
+                    // wellformed vectors
                     if let Some(vectors) = &point.vectors {
                         if let Some(vector) = &vectors.vectors_options {
                             match vector {
@@ -400,6 +380,11 @@ impl Workload {
                                                 "Vector {name} with id {point_id:?} should not be empty"
                                             )));
                                         }
+                                        if check_zeroed_vector(vector) {
+                                            return Err(Invariant(format!(
+                                                "Vector {name} with id {point_id:?} is zeroed"
+                                            )));
+                                        }
                                     }
                                 }
                             }
@@ -409,65 +394,53 @@ impl Workload {
                             "Vector {point_id:?} should be present in the response"
                         )));
                     }
+                    // check mandatory payload keys
+                    if !point.payload.contains_key(MANDATORY_PAYLOAD_BOOL_KEY) {
+                        return Err(Invariant(format!(
+                            "Vector {point_id:?} is missing {MANDATORY_PAYLOAD_BOOL_KEY} payload in storage"
+                        )));
+                    }
+                    if !point.payload.contains_key(MANDATORY_PAYLOAD_TIMESTAMP_KEY) {
+                        return Err(Invariant(format!(
+                            "Vector {point_id:?} is missing {MANDATORY_PAYLOAD_TIMESTAMP_KEY} payload in storage"
+                        )));
+                    }
                 }
             }
         }
         Ok(())
     }
 
-    async fn data_consistency_check(&self, client: &Qdrant) -> Result<(), CrasherError> {
-        // check all points present in storage
-        self.check_no_missing_point(client).await?;
-        // check mandatory payload key via null index
-        self.check_null_index(client).await?;
-        // check mandatory payload key via match query
-        self.check_bool_index(client).await?;
-
+    /// Validate data consistency from the client side
+    /// - all point ids exist
+    /// - all named vectors exist
+    /// - all mandatory payload keys exist
+    async fn data_consistency_check(
+        &self,
+        client: &Qdrant,
+        current_count: usize,
+    ) -> Result<(), CrasherError> {
+        // check all points and vector present in storage
+        self.check_points_consistency(client, current_count).await?;
+        // check mandatory timestamp payload key via null index
+        self.check_filter_null_index(client, current_count).await?;
+        // check mandatory bool payload key via match query
+        self.check_filter_bool_index(client, current_count).await?;
         Ok(())
     }
 
-    async fn check_no_missing_point(&self, client: &Qdrant) -> Result<(), CrasherError> {
-        let current_count = get_points_count(client, &self.collection_name).await?;
-        let resp = client
-            .scroll(ScrollPointsBuilder::new(&self.collection_name).limit(current_count as u32))
-            .await?;
-        let points: HashSet<_> = resp
-            .result
-            .into_iter()
-            .filter_map(|point| {
-                point.id.and_then(|pid| {
-                    pid.point_id_options.and_then(|options| match options {
-                        PointIdOptions::Num(id) => Some(id),
-                        PointIdOptions::Uuid(_) => None,
-                    })
-                })
-            })
-            .collect();
-
-        let missing_points: Vec<_> = (0..current_count as u64)
-            .filter(|id| !points.contains(id))
-            .collect();
-
-        if missing_points.is_empty() {
-            Ok(())
-        } else {
-            Err(Invariant(format!(
-                "Out of {}, detected {} points missing!\n{:?}",
-                current_count,
-                missing_points.len(),
-                missing_points,
-            )))
-        }
-    }
-
-    async fn check_null_index(&self, client: &Qdrant) -> Result<(), CrasherError> {
+    async fn check_filter_null_index(
+        &self,
+        client: &Qdrant,
+        current_count: usize,
+    ) -> Result<(), CrasherError> {
         let resp = client
             .scroll(
                 ScrollPointsBuilder::new(&self.collection_name)
                     .filter(Filter::must([Condition::is_empty(
                         MANDATORY_PAYLOAD_TIMESTAMP_KEY,
                     )]))
-                    .limit(self.points_count.try_into().unwrap()),
+                    .limit(current_count as u32),
             )
             .await?;
         let points: Vec<_> = resp
@@ -480,7 +453,7 @@ impl Workload {
             Ok(())
         } else {
             Err(Invariant(format!(
-                "Detected {} points missing the '{}' payload key!\n{:?}",
+                "Detected {} points missing the '{}' payload key when matching for null values!\n{:?}",
                 points.len(),
                 MANDATORY_PAYLOAD_TIMESTAMP_KEY,
                 points,
@@ -488,9 +461,11 @@ impl Workload {
         }
     }
 
-    async fn check_bool_index(&self, client: &Qdrant) -> Result<(), CrasherError> {
-        let current_count = get_points_count(client, &self.collection_name).await?;
-
+    async fn check_filter_bool_index(
+        &self,
+        client: &Qdrant,
+        current_count: usize,
+    ) -> Result<(), CrasherError> {
         let resp = client
             .scroll(
                 ScrollPointsBuilder::new(&self.collection_name)
@@ -498,7 +473,7 @@ impl Workload {
                         MANDATORY_PAYLOAD_BOOL_KEY,
                         true,
                     )]))
-                    .limit(self.points_count.try_into().unwrap()),
+                    .limit(current_count as u32),
             )
             .await?;
         let points: HashSet<_> = resp
@@ -522,7 +497,7 @@ impl Workload {
             Ok(())
         } else {
             Err(Invariant(format!(
-                "Out of {}, detected {} points missing the '{}: true' payload!\n{:?}",
+                "Out of {}, detected {} points missing the '{}: true' when matching payload!\n{:?}",
                 current_count,
                 missing_points.len(),
                 MANDATORY_PAYLOAD_BOOL_KEY,

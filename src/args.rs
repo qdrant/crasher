@@ -58,10 +58,4 @@ pub struct Args {
     /// Duplication factor for generating additional named vectors
     #[arg(long, default_value_t = 2)]
     pub duplication_factor: usize,
-    /// Whether to perform extra consistency check
-    #[arg(long, default_value_t = false)]
-    pub consistency_check: bool,
-    /// Enable additional check that all points contain payload
-    #[arg(long)]
-    pub missing_payload_check: bool,
 }

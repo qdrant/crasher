@@ -78,7 +78,7 @@ jobs:
         run: cargo build --release
       - name: Build Qdrant (debug)
         working-directory: /home/runner/work/crasher/crasher/qdrant-src
-        run: cargo build --features "service_debug data-consistency-check"
+        run: cargo build --features "service_debug"
       - name: Crash things
         working-directory: /home/runner/work/crasher/crasher
         shell: bash
