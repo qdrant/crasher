@@ -11,12 +11,15 @@ use qdrant_client::qdrant::{
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
 use crate::args::Args;
 use crate::client::{
-    create_collection, create_field_index, delete_points, get_collection_info, get_points_count,
-    insert_points_batch, query_batch_points, retrieve_points, set_payload,
+    count_collection_snapshots, create_collection, create_collection_snapshot, create_field_index,
+    delete_all_collection_snapshot, delete_collection_snapshot, delete_points, get_collection_info,
+    get_points_count, insert_points_batch, query_batch_points, retrieve_points, set_payload,
 };
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
@@ -65,7 +68,7 @@ impl Workload {
 impl Workload {
     pub async fn work(&self, client: &Qdrant, args: Arc<Args>) {
         loop {
-            if self.stopped.clone().load(Ordering::Relaxed) {
+            if self.stopped.load(Ordering::Relaxed) {
                 break;
             }
             let run = self.run(client, args.clone()).await;
@@ -251,7 +254,16 @@ impl Workload {
 
             log::info!("Run: delete existing points ({current_count})");
             delete_points(client, &self.collection_name, current_count).await?;
+            let snapshots_count = count_collection_snapshots(client, &self.collection_name).await?;
+            if snapshots_count > 0 {
+                log::info!("Run: delete existing snapshots ({snapshots_count})");
+                // TODO restore existing snapshot and check those are consistent
+                delete_all_collection_snapshot(client, &self.collection_name).await?;
+            }
         }
+
+        log::info!("Run: trigger collection snapshot in the background");
+        let snapshotting_handle = self.trigger_continous_snapshotting(client);
 
         log::info!("Run: insert points");
         insert_points_batch(
@@ -324,6 +336,9 @@ impl Workload {
             .await?;
             check_search_result(results)?;
         }
+
+        // Stop on-going snapshotting task
+        snapshotting_handle.abort();
 
         log::info!("Workload finished");
         Ok(())
@@ -480,6 +495,41 @@ impl Workload {
             )))
         }
     }
+
+    fn trigger_continous_snapshotting(
+        &self,
+        client: &Qdrant,
+    ) -> JoinHandle<Result<(), CrasherError>> {
+        let collection_name = self.collection_name.clone();
+        let client_snapshot = client.clone();
+        let stopped = self.stopped.clone();
+        tokio::spawn(async move {
+            while !stopped.load(Ordering::Relaxed) {
+                match churn_collection_snapshot(&client_snapshot, &collection_name).await {
+                    Ok(_) => tokio::time::sleep(Duration::from_secs(1)).await,
+                    Err(err) => {
+                        log::warn!("Snapshotting failed {err}");
+                        // stop at first snapshot error silently
+                        return Err(err);
+                    }
+                }
+            }
+            Ok(())
+        })
+    }
+}
+
+async fn churn_collection_snapshot(
+    client: &Qdrant,
+    collection_name: &str,
+) -> Result<(), CrasherError> {
+    let response = create_collection_snapshot(client, collection_name).await?;
+    let snapshot_name = response
+        .snapshot_description
+        .expect("no snapshot description!")
+        .name;
+    let _response = delete_collection_snapshot(client, collection_name, &snapshot_name).await?;
+    Ok(())
 }
 
 /// Checks if this is a zeroed vector.

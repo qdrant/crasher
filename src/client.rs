@@ -13,10 +13,11 @@ use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
 use qdrant_client::qdrant::{
     CollectionInfo, CountPointsBuilder, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder,
-    DeletePointsBuilder, FieldType, GetPointsBuilder, GetResponse, OptimizersConfigDiff, PointId,
-    PointStruct, Query, QueryBatchPointsBuilder, QueryBatchResponse, QueryPoints, ReplicaState,
-    SetPayloadPointsBuilder, SparseVectorConfig, UpsertPointsBuilder, Vector, VectorInput,
-    VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
+    CreateSnapshotResponse, DeletePointsBuilder, DeleteSnapshotRequestBuilder,
+    DeleteSnapshotResponse, FieldType, GetPointsBuilder, GetResponse, OptimizersConfigDiff,
+    PointId, PointStruct, Query, QueryBatchPointsBuilder, QueryBatchResponse, QueryPoints,
+    ReplicaState, SetPayloadPointsBuilder, SparseVectorConfig, UpsertPointsBuilder, Vector,
+    VectorInput, VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
 use rand::Rng;
 use std::collections::HashMap;
@@ -513,4 +514,76 @@ pub async fn delete_points(
     } else {
         Ok(())
     }
+}
+
+/// Trigger collection snapshot
+pub async fn create_collection_snapshot(
+    client: &Qdrant,
+    collection_name: &str,
+) -> Result<CreateSnapshotResponse, anyhow::Error> {
+    let collection_snapshot_info =
+        client
+            .create_snapshot(collection_name)
+            .await
+            .context(format!(
+                "Failed to create collection snapshot for {collection_name}"
+            ))?;
+    Ok(collection_snapshot_info)
+}
+
+/// Delete collection snapshot
+pub async fn delete_collection_snapshot(
+    client: &Qdrant,
+    collection_name: &str,
+    snapshot_name: &str,
+) -> Result<DeleteSnapshotResponse, anyhow::Error> {
+    let collection_snapshot_info = client
+        .delete_snapshot(DeleteSnapshotRequestBuilder::new(
+            collection_name,
+            snapshot_name,
+        ))
+        .await
+        .context(format!(
+            "Failed to delete collection snapshot for {collection_name}"
+        ))?;
+    Ok(collection_snapshot_info)
+}
+
+/// List collection snapshots
+pub async fn list_collection_snapshots(
+    client: &Qdrant,
+    collection_name: &str,
+) -> Result<Vec<String>, anyhow::Error> {
+    let snapshots = client
+        .list_snapshots(collection_name)
+        .await
+        .context(format!(
+            "Failed to list collection snapshots for {collection_name}"
+        ))?
+        .snapshot_descriptions;
+    Ok(snapshots
+        .into_iter()
+        .map(|s| s.name)
+        .collect::<Vec<String>>())
+}
+
+/// Delete collection snapshot
+pub async fn delete_all_collection_snapshot(
+    client: &Qdrant,
+    collection_name: &str,
+) -> Result<(), anyhow::Error> {
+    let list = list_collection_snapshots(client, collection_name).await?;
+    for snapshot_name in &list {
+        delete_collection_snapshot(client, collection_name, snapshot_name).await?;
+    }
+    Ok(())
+}
+
+/// Count collection snapshots
+pub async fn count_collection_snapshots(
+    client: &Qdrant,
+    collection_name: &str,
+) -> Result<usize, anyhow::Error> {
+    let snapshots = list_collection_snapshots(client, collection_name).await?;
+    Ok(snapshots.len())
 }
