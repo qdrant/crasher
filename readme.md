@@ -30,11 +30,13 @@ Options:
       --points-count <POINTS_COUNT>
           Number of points to generate [default: 5000]
       --vector-dimension <VECTOR_DIMENSION>
-          Dimension of generated vectors [default: 1024]
+          Dimension of generated vectors [default: 10]
       --flush-interval-sec <FLUSH_INTERVAL_SEC>
           Configure the flush interval for collections [default: 5]
       --segment-count <SEGMENT_COUNT>
           Configure the number of segment [default: 2]
+      --shard-count <SHARD_COUNT>
+          Configure the number of shards [default: 1]
       --replication-factor <REPLICATION_FACTOR>
           Replication factor for collections [default: 1]
       --write-consistency-factor <WRITE_CONSISTENCY_FACTOR>

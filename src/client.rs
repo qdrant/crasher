@@ -279,6 +279,7 @@ pub async fn create_collection(
         .sparse_vectors_config(sparse_vectors_config)
         .replication_factor(args.replication_factor as u32)
         .write_consistency_factor(args.write_consistency_factor as u32)
+        .shard_number(args.shard_count as u32)
         .optimizers_config(OptimizersConfigDiff {
             deleted_threshold: None,
             vacuum_min_vector_number: None,
