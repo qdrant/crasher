@@ -319,6 +319,8 @@ impl Workload {
         // Stop on-going snapshotting task
         snapshotting_handle.abort();
         let _ = snapshotting_handle.await;
+        // extra time for ongoing snapshotting task to finish
+        tokio::time::sleep(Duration::from_secs(3)).await;
 
         log::info!("Workload finished");
         Ok(())
