@@ -263,7 +263,7 @@ impl Workload {
             self.points_count,
             self.vec_dim,
             0,    // no payload at first
-            true, // add payload keys
+            true, // add mandatory payload keys
             args.only_sparse,
             &self.test_named_vectors,
             None,
@@ -318,9 +318,11 @@ impl Workload {
 
         // Stop on-going snapshotting task
         snapshotting_handle.abort();
-        let _ = snapshotting_handle.await;
+
+        // UNCOMMENT TO WAIT FOR SNAPSHOTTING TO FINISH
+        //let _ = snapshotting_handle.await;
         // extra time for ongoing snapshotting task to finish
-        tokio::time::sleep(Duration::from_secs(3)).await;
+        //tokio::time::sleep(Duration::from_secs(3)).await;
 
         log::info!("Workload finished");
         Ok(())
@@ -400,12 +402,12 @@ impl Workload {
                     // check mandatory payload keys
                     if !point.payload.contains_key(MANDATORY_PAYLOAD_BOOL_KEY) {
                         return Err(Invariant(format!(
-                            "Vector {point_id:?} is missing {MANDATORY_PAYLOAD_BOOL_KEY} payload in storage"
+                            "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_BOOL_KEY} in storage"
                         )));
                     }
                     if !point.payload.contains_key(MANDATORY_PAYLOAD_TIMESTAMP_KEY) {
                         return Err(Invariant(format!(
-                            "Vector {point_id:?} is missing {MANDATORY_PAYLOAD_TIMESTAMP_KEY} payload in storage"
+                            "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_TIMESTAMP_KEY} in storage"
                         )));
                     }
                 }
