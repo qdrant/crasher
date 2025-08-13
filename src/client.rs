@@ -304,6 +304,9 @@ pub async fn create_collection(
 }
 
 /// insert points into collection (blocking)
+///
+/// Split into upload into batches.
+/// Only wait for the last batch to finish.
 #[allow(clippy::too_many_arguments)]
 pub async fn insert_points_batch(
     client: &Qdrant,
@@ -388,7 +391,7 @@ pub async fn insert_points_batch(
             return Err(Cancelled);
         }
 
-        client
+        let resp = client
             .upsert_points(
                 UpsertPointsBuilder::new(collection_name, points)
                     .ordering(write_ordering.unwrap_or_default())
@@ -398,6 +401,12 @@ pub async fn insert_points_batch(
             .context(format!(
                 "Failed to insert {batch_size} points (batch {batch_id}/{num_batches}) into {collection_name}"
             ))?;
+
+        if resp.result.unwrap().status != 2 && resp.result.unwrap().status != 1 {
+            return Err(CrasherError::Invariant(format!(
+                "Failed to insert {batch_size} points (batch {batch_id}/{num_batches}) into {collection_name}"
+            )));
+        }
     }
     Ok(())
 }
@@ -452,8 +461,7 @@ pub async fn set_payload(
 
     if resp.result.unwrap().status != 2 {
         Err(CrasherError::Invariant(format!(
-            "Failed to set payload on point_id {} for {}",
-            point_id, collection_name
+            "Failed to set payload on point_id {point_id} for {collection_name}"
         )))
     } else {
         Ok(())
