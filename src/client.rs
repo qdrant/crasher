@@ -423,13 +423,15 @@ pub async fn create_field_index(
 }
 
 /// Set payload (blocking)
+///
+/// Expects the `point_id` to exist.
 pub async fn set_payload(
     client: &Qdrant,
     collection_name: &str,
     point_id: u64,
     payload_count: usize,
     write_ordering: Option<WriteOrdering>,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), CrasherError> {
     let payload = random_payload(Some(payload_count));
 
     let points_id_selector = vec![PointId {
@@ -449,11 +451,10 @@ pub async fn set_payload(
         ))?;
 
     if resp.result.unwrap().status != 2 {
-        Err(anyhow::anyhow!(
+        Err(CrasherError::Invariant(format!(
             "Failed to set payload on point_id {} for {}",
-            point_id,
-            collection_name
-        ))
+            point_id, collection_name
+        )))
     } else {
         Ok(())
     }
