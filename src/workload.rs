@@ -81,10 +81,10 @@ impl Workload {
                     break;
                 }
                 Err(Invariant(msg)) => {
-                    log::error!("Workload run failed with violation!\n{msg}");
+                    log::error!("Workload run failed due to an invariant violation!\n{msg}");
                     // send stop signal to the main thread
                     self.stopped.store(true, Ordering::Relaxed);
-                    log::error!("Stopping the workload...");
+                    log::info!("Stopping the workload...");
                     break;
                 }
                 Err(Client(error)) => {
