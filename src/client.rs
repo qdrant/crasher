@@ -7,7 +7,6 @@ use crate::generators::{
     random_dense_vector, random_filter, random_payload, random_sparse_vector,
 };
 use anyhow::Context;
-use qdrant_client::Qdrant;
 use qdrant_client::qdrant::payload_index_params::IndexParams;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
@@ -19,6 +18,7 @@ use qdrant_client::qdrant::{
     ReplicaState, SetPayloadPointsBuilder, SparseVectorConfig, UpsertPointsBuilder, Vector,
     VectorInput, VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
+use qdrant_client::{Qdrant, QdrantError};
 use rand::Rng;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -397,14 +397,17 @@ pub async fn insert_points_batch(
                     .ordering(write_ordering.unwrap_or_default())
                     .wait(wait),
             )
-            .await
-            .context(format!(
-                "Failed to insert {batch_size} points (batch {batch_id}/{num_batches}) into {collection_name}"
-            ))?;
+            .await;
 
-        if resp.result.unwrap().status != 2 && resp.result.unwrap().status != 1 {
+        // IO error are transient
+        if let Err(QdrantError::Io(err)) = resp {
+            return Err(CrasherError::Client(err.into()));
+        }
+
+        // All other errors are fatal
+        if let Err(err) = resp {
             return Err(CrasherError::Invariant(format!(
-                "Failed to insert {batch_size} points (batch {batch_id}/{num_batches}) into {collection_name}"
+                "Failed to insert {batch_size} points (batch {batch_id}/{num_batches}) into {collection_name} cause by:\n{err}"
             )));
         }
     }
@@ -454,18 +457,21 @@ pub async fn set_payload(
                 .ordering(write_ordering.unwrap_or_default())
                 .wait(true),
         )
-        .await
-        .context(format!(
-            "Failed to set payload for {point_id} with payload_count {payload_count}"
-        ))?;
+        .await;
 
-    if resp.result.unwrap().status != 2 {
-        Err(CrasherError::Invariant(format!(
-            "Failed to set payload on point_id {point_id} for {collection_name}"
-        )))
-    } else {
-        Ok(())
+    // IO error are transient
+    if let Err(QdrantError::Io(err)) = resp {
+        return Err(CrasherError::Client(err.into()));
     }
+
+    // All other errors are fatal
+    if let Err(err) = resp {
+        return Err(CrasherError::Invariant(format!(
+            "Failed to set payload on point_id {point_id} for {collection_name} caused by:\n{err}"
+        )));
+    }
+
+    Ok(())
 }
 
 /// Retrieve points with vectors and payload
