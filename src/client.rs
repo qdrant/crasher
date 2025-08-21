@@ -487,25 +487,14 @@ pub async fn delete_points(
         .collect::<Vec<_>>();
 
     // delete all points
-    let resp = client
+    client
         .delete_points(
             DeletePointsBuilder::new(collection_name)
                 .points(points_selector)
                 .wait(true),
         )
-        .await
-        .context(format!(
-            "Failed to delete {points_count} points for {collection_name}"
-        ))?;
-    if resp.result.unwrap().status != 2 {
-        Err(anyhow::anyhow!(
-            "Failed to delete {} points for {}",
-            points_count,
-            collection_name
-        ))
-    } else {
-        Ok(())
-    }
+        .await?;
+    Ok(())
 }
 
 /// Trigger collection snapshot
