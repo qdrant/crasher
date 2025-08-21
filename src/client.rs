@@ -339,8 +339,7 @@ pub async fn insert_points_batch(
         let (wait, batch_size) = if batch_id == num_batches - 1 {
             (true, last_batch_size)
         } else {
-            // TODO use `false` once snapshot bug is fixed
-            (true, batch_size)
+            (false, batch_size)
         };
         let mut points = Vec::with_capacity(batch_size);
         let batch_base_id = batch_id as u64 * max_batch_size as u64;
