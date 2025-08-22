@@ -6,7 +6,6 @@ use crate::generators::{
     MANDATORY_PAYLOAD_BOOL_KEY, MANDATORY_PAYLOAD_TIMESTAMP_KEY, TestNamedVectors,
     random_dense_vector, random_filter, random_payload, random_sparse_vector,
 };
-use anyhow::Context;
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::payload_index_params::IndexParams;
 use qdrant_client::qdrant::point_id::PointIdOptions;
@@ -93,13 +92,10 @@ pub async fn wait_server_ready(
 pub async fn get_collection_info(
     client: &Qdrant,
     collection_name: &str,
-) -> Result<CollectionInfo, anyhow::Error> {
+) -> Result<CollectionInfo, CrasherError> {
     let collection_info = client
         .collection_info(collection_name)
-        .await
-        .context(format!(
-            "Failed to fetch collection info for {collection_name}"
-        ))?
+        .await?
         .result
         .unwrap();
     Ok(collection_info)
@@ -110,13 +106,10 @@ pub async fn get_collection_info(
 pub async fn get_info_points_count(
     client: &Qdrant,
     collection_name: &str,
-) -> Result<usize, anyhow::Error> {
+) -> Result<usize, CrasherError> {
     let point_count = client
         .collection_info(collection_name)
-        .await
-        .context(format!(
-            "Failed to fetch points count for {collection_name}"
-        ))?
+        .await?
         .result
         .unwrap()
         .points_count;
@@ -127,11 +120,10 @@ pub async fn get_info_points_count(
 pub async fn get_exact_points_count(
     client: &Qdrant,
     collection_name: &str,
-) -> Result<usize, anyhow::Error> {
+) -> Result<usize, CrasherError> {
     let point_count = client
         .count(CountPointsBuilder::new(collection_name).exact(true))
-        .await
-        .context(format!("Failed to run points count for {collection_name}"))?
+        .await?
         .result
         .unwrap()
         .count;
@@ -149,7 +141,7 @@ pub async fn query_batch_points(
     payload_count: usize,
     with_vector: bool,
     limit: u64,
-) -> Result<QueryBatchResponse, anyhow::Error> {
+) -> Result<QueryBatchResponse, CrasherError> {
     let request_filter = random_filter(Some(payload_count));
     let mut requests = vec![];
 
@@ -237,8 +229,7 @@ pub async fn query_batch_points(
 
     let response = client
         .query_batch(QueryBatchPointsBuilder::new(collection_name, requests))
-        .await
-        .context(format!("Failed to query batch points on {collection_name}"))?;
+        .await?;
 
     Ok(response)
 }
@@ -249,7 +240,7 @@ pub async fn create_collection(
     collection_name: &str,
     test_named_vectors: &TestNamedVectors,
     args: Arc<Args>,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), CrasherError> {
     let sparse_vector_params = test_named_vectors.sparse_vectors();
     let sparse_vectors_config = SparseVectorConfig {
         map: sparse_vector_params,
@@ -296,10 +287,7 @@ pub async fn create_collection(
         request = request.vectors_config(dense_vectors_config);
     }
 
-    client
-        .create_collection(request)
-        .await
-        .context(format!("Failed to create collection {collection_name}"))?;
+    client.create_collection(request).await?;
     Ok(())
 }
 
@@ -408,17 +396,14 @@ pub async fn create_field_index(
     field_name: &str,
     field_type: FieldType,
     field_index_params: impl Into<IndexParams>,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), CrasherError> {
     client
         .create_field_index(
             CreateFieldIndexCollectionBuilder::new(collection_name, field_name, field_type)
                 .field_index_params(field_index_params.into())
                 .wait(true),
         )
-        .await
-        .context(format!(
-            "Failed to create field index {field_name} for collection {collection_name}",
-        ))?;
+        .await?;
     Ok(())
 }
 
@@ -455,7 +440,7 @@ pub async fn retrieve_points(
     client: &Qdrant,
     collection_name: &str,
     ids: &[usize],
-) -> Result<GetResponse, anyhow::Error> {
+) -> Result<GetResponse, CrasherError> {
     let response = client
         .get_points(
             GetPointsBuilder::new(
@@ -468,8 +453,7 @@ pub async fn retrieve_points(
             .with_vectors(true)
             .with_payload(true),
         )
-        .await
-        .context(format!("Failed to retrieve points on {collection_name}"))?;
+        .await?;
 
     Ok(response)
 }
@@ -479,7 +463,7 @@ pub async fn delete_points(
     client: &Qdrant,
     collection_name: &str,
     points_count: usize,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), CrasherError> {
     let points_selector = (0..points_count as u64)
         .map(|id| PointId {
             point_id_options: Some(PointIdOptions::Num(id)),
@@ -501,14 +485,8 @@ pub async fn delete_points(
 pub async fn create_collection_snapshot(
     client: &Qdrant,
     collection_name: &str,
-) -> Result<CreateSnapshotResponse, anyhow::Error> {
-    let collection_snapshot_info =
-        client
-            .create_snapshot(collection_name)
-            .await
-            .context(format!(
-                "Failed to create collection snapshot for {collection_name}"
-            ))?;
+) -> Result<CreateSnapshotResponse, CrasherError> {
+    let collection_snapshot_info = client.create_snapshot(collection_name).await?;
     Ok(collection_snapshot_info)
 }
 
@@ -517,16 +495,13 @@ pub async fn delete_collection_snapshot(
     client: &Qdrant,
     collection_name: &str,
     snapshot_name: &str,
-) -> Result<DeleteSnapshotResponse, anyhow::Error> {
+) -> Result<DeleteSnapshotResponse, CrasherError> {
     let collection_snapshot_info = client
         .delete_snapshot(DeleteSnapshotRequestBuilder::new(
             collection_name,
             snapshot_name,
         ))
-        .await
-        .context(format!(
-            "Failed to delete collection snapshot for {collection_name}"
-        ))?;
+        .await?;
     Ok(collection_snapshot_info)
 }
 
@@ -534,13 +509,10 @@ pub async fn delete_collection_snapshot(
 pub async fn list_collection_snapshots(
     client: &Qdrant,
     collection_name: &str,
-) -> Result<Vec<String>, anyhow::Error> {
+) -> Result<Vec<String>, CrasherError> {
     let snapshots = client
         .list_snapshots(collection_name)
-        .await
-        .context(format!(
-            "Failed to list collection snapshots for {collection_name}"
-        ))?
+        .await?
         .snapshot_descriptions;
     Ok(snapshots
         .into_iter()
@@ -552,7 +524,7 @@ pub async fn list_collection_snapshots(
 pub async fn delete_all_collection_snapshot(
     client: &Qdrant,
     collection_name: &str,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), CrasherError> {
     let list = list_collection_snapshots(client, collection_name).await?;
     for snapshot_name in &list {
         delete_collection_snapshot(client, collection_name, snapshot_name).await?;
@@ -564,7 +536,7 @@ pub async fn delete_all_collection_snapshot(
 pub async fn count_collection_snapshots(
     client: &Qdrant,
     collection_name: &str,
-) -> Result<usize, anyhow::Error> {
+) -> Result<usize, CrasherError> {
     let snapshots = list_collection_snapshots(client, collection_name).await?;
     Ok(snapshots.len())
 }
