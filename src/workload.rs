@@ -318,7 +318,6 @@ impl Workload {
 
         // Stop on-going snapshotting task
         snapshotting_handle.abort();
-        let _ = snapshotting_handle.await;
 
         log::info!("Workload finished");
         Ok(())
