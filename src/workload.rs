@@ -318,7 +318,11 @@ impl Workload {
 
         // Stop on-going snapshotting task
         snapshotting_handle.abort();
-        let _ = snapshotting_handle.await;
+        match snapshotting_handle.await {
+            Ok(Ok(_)) => (),
+            Err(_) => (),                                      // ignore JoinError
+            Ok(Err(snapshot_err)) => return Err(snapshot_err), // capture failed snapshot
+        }
 
         log::info!("Workload finished");
         Ok(())

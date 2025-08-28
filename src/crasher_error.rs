@@ -25,7 +25,8 @@ impl From<qdrant_client::QdrantError> for CrasherError {
         match &err {
             QdrantError::Io(_) => anyhow::anyhow!(err).into(),
             QdrantError::ResponseError { status } => {
-                if status.code() == tonic::Code::NotFound {
+                if status.code() == tonic::Code::NotFound || status.code() == tonic::Code::Cancelled
+                {
                     CrasherError::Invariant(format!("{err}"))
                 } else {
                     anyhow::anyhow!(err).into()
