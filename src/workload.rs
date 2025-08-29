@@ -521,7 +521,7 @@ impl Workload {
         tokio::spawn(async move {
             while !stopped.load(Ordering::Relaxed) {
                 match churn_collection_snapshot(&client_snapshot, &collection_name).await {
-                    Ok(_) => tokio::time::sleep(Duration::from_secs(1)).await,
+                    Ok(_) => tokio::time::sleep(Duration::from_millis(500)).await,
                     Err(err) => {
                         log::warn!("Snapshotting failed {err}");
                         // stop at first snapshot error silently
