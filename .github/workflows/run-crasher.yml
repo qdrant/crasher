@@ -78,7 +78,9 @@ jobs:
         run: cargo build --release
       - name: Build Qdrant (debug)
         working-directory: /home/runner/work/crasher/crasher/qdrant-src
-        run: cargo build --features "service_debug"
+        # disable deadlock detector until we sort out https://github.com/Amanieu/parking_lot/issues/489
+        # run: cargo build --features "service_debug"
+        run: cargo build
       - name: Crash things
         working-directory: /home/runner/work/crasher/crasher
         shell: bash
