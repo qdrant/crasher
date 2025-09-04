@@ -46,13 +46,15 @@ Options:
       --memmap-threshold <MEMMAP_THRESHOLD>
           Maximum size (in KiloBytes) of vectors to store in-memory per segment
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
-          Timeout of gRPC client [default: 5000]
+          Timeout of gRPC client [default: 10000]
       --on-disk-payload
           Whether to use on-disk payload storage
       --only-sparse
           Whether to only upsert sparse vectors
       --duplication-factor <DUPLICATION_FACTOR>
           Duplication factor for generating additional named vectors [default: 2]
+      --shutdown-on-error
+          Whether to shutdown qdrant on error (use false to investigate deadlocks)
   -h, --help
           Print help
   -V, --version

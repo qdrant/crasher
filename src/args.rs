@@ -61,4 +61,7 @@ pub struct Args {
     /// Duplication factor for generating additional named vectors
     #[arg(long, default_value_t = 2)]
     pub duplication_factor: usize,
+    /// Whether to shutdown qdrant on error (use false to investigate deadlocks)
+    #[arg(long, default_value_t = true)]
+    pub shutdown_on_error: bool,
 }

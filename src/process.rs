@@ -14,12 +14,16 @@ use tokio::fs;
 use tokio::process::{Child, Command};
 use tokio::time::sleep;
 
-pub fn start_process(working_dir_path: &str, exec_path: &str) -> io::Result<Child> {
+pub fn start_process(
+    working_dir_path: &str,
+    exec_path: &str,
+    kill_on_drop: bool,
+) -> io::Result<Child> {
     Command::new(exec_path)
         .current_dir(working_dir_path)
         //.stdout(std::process::Stdio::piped())
         //.stderr(std::process::Stdio::piped())
-        .kill_on_drop(true) // kill child process if parent is dropped
+        .kill_on_drop(kill_on_drop) // kill child process if parent is dropped
         .spawn()
 }
 
@@ -28,24 +32,26 @@ pub struct ProcessManager {
     pub binary_path: String,
     pub backup_dirs: VecDeque<String>,
     pub child_process: Child,
+    pub kill_on_drop: bool,
 }
 
 impl ProcessManager {
     pub fn from_args(args: &Args) -> io::Result<Self> {
-        let manager = Self::new(&args.working_dir, &args.exec_path)?
+        let manager = Self::new(&args.working_dir, &args.exec_path, args.shutdown_on_error)?
             .with_backup_dirs(args.backup_working_dir.clone());
 
         Ok(manager)
     }
 
-    pub fn new(working_dir: &str, binary_path: &str) -> io::Result<Self> {
-        let child = start_process(working_dir, binary_path)?;
+    pub fn new(working_dir: &str, binary_path: &str, kill_on_drop: bool) -> io::Result<Self> {
+        let child = start_process(working_dir, binary_path, kill_on_drop)?;
 
         Ok(Self {
             working_dir: working_dir.to_string(),
             binary_path: binary_path.to_string(),
             backup_dirs: VecDeque::new(),
             child_process: child,
+            kill_on_drop,
         })
     }
 
@@ -110,7 +116,8 @@ impl ProcessManager {
                     );
                 }
 
-                self.child_process = start_process(&self.working_dir, &self.binary_path).unwrap();
+                self.child_process =
+                    start_process(&self.working_dir, &self.binary_path, self.kill_on_drop).unwrap();
 
                 if let Err(err) = wait_server_ready(client, stopped.clone(), true).await {
                     log::error!("Failed to wait for qdrant to be ready: {err:?}");
