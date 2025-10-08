@@ -91,6 +91,7 @@ impl ProcessManager {
     pub async fn chaos(
         &mut self,
         stopped: Arc<AtomicBool>,
+        crash_lock: Arc<tokio::sync::Mutex<()>>,
         client: &Qdrant,
         crash_probability: f64,
         sleep_duration_between_crash_sec: usize,
@@ -105,6 +106,7 @@ impl ProcessManager {
                 rng.random_bool(crash_probability)
             };
             if drawn {
+                let _crash_lock_guard = crash_lock.lock().await;
                 log::info!("** Restarting qdrant **");
                 self.kill_process().await;
 

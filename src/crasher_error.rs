@@ -19,6 +19,12 @@ impl From<anyhow::Error> for CrasherError {
     }
 }
 
+impl From<reqwest::Error> for CrasherError {
+    fn from(e: reqwest::Error) -> Self {
+        CrasherError::Client(e.into())
+    }
+}
+
 impl From<qdrant_client::QdrantError> for CrasherError {
     fn from(err: qdrant_client::QdrantError) -> Self {
         // Network error and timeout are detected as transient errors

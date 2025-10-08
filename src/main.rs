@@ -64,11 +64,14 @@ async fn main() {
 
                     let collection_name = COLLECTION_NAME;
 
+                    let crash_lock = Arc::new(tokio::sync::Mutex::new(()));
+
                     // workload task
                     let client_worker = client.clone();
                     let workload = Workload::new(
                         collection_name,
                         stopped.clone(),
+                        crash_lock.clone(),
                         args.duplication_factor,
                         args.points_count,
                         args.vector_dimension,
@@ -85,6 +88,7 @@ async fn main() {
                         process_manager
                             .chaos(
                                 stopped.clone(),
+                                crash_lock.clone(),
                                 &client.clone(),
                                 crash_probability,
                                 sleep_duration_between_crash_sec,

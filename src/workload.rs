@@ -17,9 +17,10 @@ use tokio::time::sleep;
 
 use crate::args::Args;
 use crate::client::{
-    count_collection_snapshots, create_collection, create_collection_snapshot, create_field_index,
-    delete_all_collection_snapshot, delete_collection_snapshot, delete_points, get_collection_info,
-    get_exact_points_count, insert_points_batch, query_batch_points, retrieve_points, set_payload,
+    create_collection, create_collection_snapshot, create_field_index, delete_collection_snapshot,
+    delete_points, get_collection_info, get_exact_points_count, insert_points_batch,
+    list_collection_snapshots, query_batch_points, restore_collection_snapshot, retrieve_points,
+    set_payload,
 };
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
@@ -38,12 +39,14 @@ pub struct Workload {
     payload_count: usize,
     write_ordering: Option<WriteOrdering>,
     stopped: Arc<AtomicBool>,
+    crash_lock: Arc<tokio::sync::Mutex<()>>, // take lock to prevent crash
 }
 
 impl Workload {
     pub fn new(
         collection_name: &str,
         stopped: Arc<AtomicBool>,
+        crash_lock: Arc<tokio::sync::Mutex<()>>,
         duplication_factor: usize,
         points_count: usize,
         vec_dim: usize,
@@ -61,6 +64,7 @@ impl Workload {
             payload_count,
             write_ordering,
             stopped,
+            crash_lock,
         }
     }
 }
@@ -245,11 +249,34 @@ impl Workload {
             log::info!("Run: delete existing points ({current_count} points)");
             delete_points(client, &self.collection_name, current_count).await?;
 
-            let snapshots_count = count_collection_snapshots(client, &self.collection_name).await?;
-            if snapshots_count > 0 {
-                log::info!("Run: delete existing snapshots ({snapshots_count} snapshots)");
-                // TODO restore existing snapshot and check those are consistent
-                delete_all_collection_snapshot(client, &self.collection_name).await?;
+            let snapshots = list_collection_snapshots(client, &self.collection_name).await?;
+            if !snapshots.is_empty() {
+                log::info!("Found {} local collection snapshots", snapshots.len());
+                for snapshot_name in &snapshots {
+                    log::info!("Run: restoring snapshot '{snapshot_name}'");
+                    // Do not crash during restore as it would leave a dummy shard behind
+                    let crash_lock_guard = self.crash_lock.lock().await;
+                    restore_collection_snapshot(&self.collection_name, snapshot_name).await?;
+                    drop(crash_lock_guard);
+
+                    delete_collection_snapshot(client, &self.collection_name, snapshot_name)
+                        .await?;
+                    let restored_count =
+                        get_exact_points_count(client, &self.collection_name).await?;
+
+                    if restored_count == 0 {
+                        log::info!("Snapshot `{snapshot_name}` does not contain any points");
+                        continue;
+                    }
+
+                    log::info!(
+                        "Run: data consistency check over {restored_count} points restored for snapshot '{snapshot_name}'"
+                    );
+                    self.data_consistency_check(client, restored_count).await?;
+
+                    delete_points(client, &self.collection_name, restored_count).await?;
+                }
+                log::info!("All snapshots validated and deleted!");
             }
         }
 

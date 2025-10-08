@@ -19,6 +19,8 @@ use qdrant_client::qdrant::{
     VectorInput, VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
 use rand::Rng;
+use reqwest::Client;
+use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -520,23 +522,29 @@ pub async fn list_collection_snapshots(
         .collect::<Vec<String>>())
 }
 
-/// Delete collection snapshot
-pub async fn delete_all_collection_snapshot(
-    client: &Qdrant,
+/// Restore local collection snapshot
+pub async fn restore_collection_snapshot(
     collection_name: &str,
+    snapshot_name: &str,
 ) -> Result<(), CrasherError> {
-    let list = list_collection_snapshots(client, collection_name).await?;
-    for snapshot_name in &list {
-        delete_collection_snapshot(client, collection_name, snapshot_name).await?;
+    // TODO add to config
+    let port = 6333;
+    let url = format!("http://localhost:{port}/collections/{collection_name}/snapshots/recover");
+
+    // setup snapshot location
+    let body = json!({
+        "location": format!(
+            "http://localhost:{port}/collections/{collection_name}/snapshots/{snapshot_name}"
+        )
+    });
+
+    let client = Client::new();
+    let response = client.put(&url).json(&body).send().await?;
+
+    if !response.status().is_success() {
+        return Err(CrasherError::Invariant(
+            "Invalid snapshot restore".to_string(),
+        ));
     }
     Ok(())
-}
-
-/// Count collection snapshots
-pub async fn count_collection_snapshots(
-    client: &Qdrant,
-    collection_name: &str,
-) -> Result<usize, CrasherError> {
-    let snapshots = list_collection_snapshots(client, collection_name).await?;
-    Ok(snapshots.len())
 }
