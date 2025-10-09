@@ -27,6 +27,7 @@ QDRANT__LOGGER__ON_DISK__LOG_FILE=$QDRANT_LOG \
 QDRANT__SERVICE__HARDWARE_REPORTING=true \
 QDRANT__STORAGE__COLLECTION_STRICT_MODE=true \
 QDRANT__FEATURE_FLAGS__ALL=true \
+QDRANT__LOG_LEVEL="TRACE,raft::raft=info,actix_http=info,tonic=info,want=info,mio=info" \
 "${CRASHER_CMD[@]}" &>"$CRASHER_LOG" &
 
 pid=$!
