@@ -252,12 +252,11 @@ impl Workload {
             let snapshots = list_collection_snapshots(client, &self.collection_name).await?;
             if !snapshots.is_empty() {
                 log::info!("Found {} local collection snapshots", snapshots.len());
+                // Do not crash during restore as it would leave a dummy shard behind & make sure we delete snapshots
+                let _crash_lock_guard = self.crash_lock.lock().await;
                 for snapshot_name in &snapshots {
                     log::info!("Run: restoring snapshot '{snapshot_name}'");
-                    // Do not crash during restore as it would leave a dummy shard behind
-                    let crash_lock_guard = self.crash_lock.lock().await;
                     restore_collection_snapshot(&self.collection_name, snapshot_name).await?;
-                    drop(crash_lock_guard);
 
                     delete_collection_snapshot(client, &self.collection_name, snapshot_name)
                         .await?;

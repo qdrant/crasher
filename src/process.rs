@@ -106,7 +106,10 @@ impl ProcessManager {
                 rng.random_bool(crash_probability)
             };
             if drawn {
-                let _crash_lock_guard = crash_lock.lock().await;
+                let Ok(_crash_lock_guard) = crash_lock.try_lock() else {
+                    // give up draw if crashing is not allowed
+                    continue;
+                };
                 log::info!("** Restarting qdrant **");
                 self.kill_process().await;
 
