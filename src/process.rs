@@ -19,11 +19,21 @@ pub fn start_process(
     exec_path: &str,
     kill_on_drop: bool,
 ) -> io::Result<Child> {
-    Command::new(exec_path)
+    Command::new("systemd-run")
+        .arg("--user")
+        .arg("--scope")
+        .arg("-p")
+        .arg("CPUQuota=8%")
+        .arg("--")
+        .arg(exec_path)
         .current_dir(working_dir_path)
-        //.stdout(std::process::Stdio::piped())
-        //.stderr(std::process::Stdio::piped())
-        .kill_on_drop(kill_on_drop) // kill child process if parent is dropped
+        .kill_on_drop(kill_on_drop)
+        .env("QDRANT__LOGGER__ON_DISK__ENABLED", "true")
+        .env("QDRANT__LOGGER__ON_DISK__LOG_FILE", "./qdrant.log")
+        .env("QDRANT__SERVICE__HARDWARE_REPORTING", "true")
+        .env("QDRANT__STORAGE__COLLECTION_STRICT_MODE", "true")
+        .env("QDRANT__FEATURE_FLAGS__ALL", "true")
+        .env("QDRANT__LOG_LEVEL","TRACE,raft::raft=info,actix_http=info,tonic=info,want=info,mio=info")
         .spawn()
 }
 
