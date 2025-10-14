@@ -10,7 +10,7 @@ anyhow = "1.0.100"
 thiserror = "2.0.16"
 chrono = "0.4.42"
 rand = "0.9.2"
-clap = { version = "4.5.48", features = ["derive"] }
+clap = { version = "4.5.49", features = ["derive"] }
 futures = { version = "0.3.31", default-features = false, features = [
     "async-await",
     "std",
@@ -26,4 +26,4 @@ env_logger = "0.11.8"
 serde_json = "1.0.145"
 uuid = { version = "1.18.1", features = ["v4", "serde"] }
 tonic = "0.12.3"
-reqwest = { version = "0.12.3", features = ["json"] } # for snapshot restore
+reqwest = { version = "0.12.24", features = ["json"] } # for snapshot restore
