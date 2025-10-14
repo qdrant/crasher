@@ -17,14 +17,28 @@ use tokio::time::sleep;
 pub fn start_process(
     working_dir_path: &str,
     exec_path: &str,
-    kill_on_drop: bool,
+    kill_on_drop: bool, // kill child process if parent is dropped
+    cpu_quota: Option<usize>,
 ) -> io::Result<Child> {
-    Command::new(exec_path)
-        .current_dir(working_dir_path)
-        //.stdout(std::process::Stdio::piped())
-        //.stderr(std::process::Stdio::piped())
-        .kill_on_drop(kill_on_drop) // kill child process if parent is dropped
-        .spawn()
+    if let Some(cpu_quota) = cpu_quota {
+        Command::new("systemd-run")
+            .arg("--user")
+            .arg("--scope")
+            .arg("-p")
+            .arg(format!("CPUQuota={cpu_quota}%"))
+            .arg("--")
+            .arg(exec_path)
+            .current_dir(working_dir_path)
+            .kill_on_drop(kill_on_drop)
+            .spawn()
+    } else {
+        Command::new(exec_path)
+            .current_dir(working_dir_path)
+            //.stdout(std::process::Stdio::piped())
+            //.stderr(std::process::Stdio::piped())
+            .kill_on_drop(kill_on_drop)
+            .spawn()
+    }
 }
 
 pub struct ProcessManager {
@@ -33,18 +47,29 @@ pub struct ProcessManager {
     pub backup_dirs: VecDeque<String>,
     pub child_process: Child,
     pub kill_on_drop: bool,
+    pub cpu_quota: Option<usize>,
 }
 
 impl ProcessManager {
     pub fn from_args(args: &Args) -> io::Result<Self> {
-        let manager = Self::new(&args.working_dir, &args.exec_path, args.shutdown_on_error)?
-            .with_backup_dirs(args.backup_working_dir.clone());
+        let manager = Self::new(
+            &args.working_dir,
+            &args.exec_path,
+            args.shutdown_on_error,
+            args.cpu_quota,
+        )?
+        .with_backup_dirs(args.backup_working_dir.clone());
 
         Ok(manager)
     }
 
-    pub fn new(working_dir: &str, binary_path: &str, kill_on_drop: bool) -> io::Result<Self> {
-        let child = start_process(working_dir, binary_path, kill_on_drop)?;
+    pub fn new(
+        working_dir: &str,
+        binary_path: &str,
+        kill_on_drop: bool,
+        cpu_quota: Option<usize>,
+    ) -> io::Result<Self> {
+        let child = start_process(working_dir, binary_path, kill_on_drop, cpu_quota)?;
 
         Ok(Self {
             working_dir: working_dir.to_string(),
@@ -52,6 +77,7 @@ impl ProcessManager {
             backup_dirs: VecDeque::new(),
             child_process: child,
             kill_on_drop,
+            cpu_quota,
         })
     }
 
@@ -121,8 +147,13 @@ impl ProcessManager {
                     );
                 }
 
-                self.child_process =
-                    start_process(&self.working_dir, &self.binary_path, self.kill_on_drop).unwrap();
+                self.child_process = start_process(
+                    &self.working_dir,
+                    &self.binary_path,
+                    self.kill_on_drop,
+                    self.cpu_quota,
+                )
+                .unwrap();
 
                 if let Err(err) = wait_server_ready(client, stopped.clone(), true).await {
                     log::error!("Failed to wait for qdrant to be ready: {err:?}");

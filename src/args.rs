@@ -64,4 +64,7 @@ pub struct Args {
     /// Whether to shutdown qdrant on error (use false to investigate deadlocks)
     #[arg(long, default_value_t = true)]
     pub shutdown_on_error: bool,
+    /// CPU quotas in percent for the Qdrant binary
+    #[arg(long)]
+    pub cpu_quota: Option<usize>,
 }

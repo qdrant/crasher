@@ -55,6 +55,8 @@ Options:
           Duplication factor for generating additional named vectors [default: 2]
       --shutdown-on-error
           Whether to shutdown qdrant on error (use false to investigate deadlocks)
+      --cpu-quota <CPU_QUOTA>
+              CPU quotas in percent for the Qdrant binary
   -h, --help
           Print help
   -V, --version
