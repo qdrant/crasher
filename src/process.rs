@@ -20,25 +20,27 @@ pub fn start_process(
     kill_on_drop: bool, // kill child process if parent is dropped
     cpu_quota: Option<usize>,
 ) -> io::Result<Child> {
-    if let Some(cpu_quota) = cpu_quota {
-        Command::new("systemd-run")
-            .arg("--user")
+    let mut cmd = if let Some(cpu_quota) = cpu_quota {
+        let mut c = Command::new("systemd-run");
+        c.arg("--user")
             .arg("--scope")
             .arg("-p")
-            .arg(format!("CPUQuota={cpu_quota}%"))
+            .arg(format!("CPUQuota={}%", cpu_quota))
             .arg("--")
-            .arg(exec_path)
-            .current_dir(working_dir_path)
-            .kill_on_drop(kill_on_drop)
-            .spawn()
+            .arg(exec_path);
+        c
     } else {
         Command::new(exec_path)
-            .current_dir(working_dir_path)
-            //.stdout(std::process::Stdio::piped())
-            //.stderr(std::process::Stdio::piped())
-            .kill_on_drop(kill_on_drop)
-            .spawn()
-    }
+    };
+
+    cmd.current_dir(working_dir_path)
+        .env("QDRANT__CLUSTER__ENABLED", "true")
+        .arg("--uri")
+        .arg("http://127.0.0.1:6335")
+        //.stdout(std::process::Stdio::piped())
+        //.stderr(std::process::Stdio::piped())
+        .kill_on_drop(kill_on_drop)
+        .spawn()
 }
 
 pub struct ProcessManager {
