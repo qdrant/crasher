@@ -60,10 +60,10 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       # checkout crasher
       - name: Checkout Crasher
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       # checkout qdrant dev
       - name: Checkout Qdrant
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: qdrant/qdrant
           ref: ${{ steps.default_inputs.outputs.qdrant_version }}

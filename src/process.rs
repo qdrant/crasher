@@ -25,7 +25,7 @@ pub fn start_process(
         c.arg("--user")
             .arg("--scope")
             .arg("-p")
-            .arg(format!("CPUQuota={}%", cpu_quota))
+            .arg(format!("CPUQuota={cpu_quota}%"))
             .arg("--")
             .arg(exec_path);
         c
