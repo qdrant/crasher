@@ -42,6 +42,7 @@ impl From<qdrant_client::QdrantError> for CrasherError {
                 status: _,
                 retry_after_seconds: _,
             } => anyhow::anyhow!(err).into(),
+            QdrantError::PayloadDeserialization(_) => CrasherError::Invariant(format!("{err}")),
             QdrantError::ConversionError(_) => CrasherError::Invariant(format!("{err}")),
             QdrantError::InvalidUri(_) => CrasherError::Invariant(format!("{err}")),
             QdrantError::NoSnapshotFound(_) => CrasherError::Invariant(format!("{err}")),

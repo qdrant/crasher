@@ -72,6 +72,7 @@ impl TestNamedVectors {
             max_indexing_threads: None,
             on_disk: Some(false),
             payload_m: None,
+            inline_storage: None,
         });
 
         // dense vectors on disk

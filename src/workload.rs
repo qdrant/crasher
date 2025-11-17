@@ -355,6 +355,7 @@ impl Workload {
     }
 
     /// Vector data consistency checker for id range
+    #[allow(deprecated)]
     async fn check_points_consistency(
         &self,
         client: &Qdrant,
@@ -574,6 +575,7 @@ async fn churn_collection_snapshot(
 }
 
 /// Checks if this is a zeroed vector.
+#[allow(deprecated)]
 fn check_zeroed_vector(vector: &VectorOutput) -> bool {
     vector
         .vector
