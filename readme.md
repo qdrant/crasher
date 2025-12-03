@@ -36,7 +36,7 @@ Options:
       --segment-count <SEGMENT_COUNT>
           Configure the number of segment [default: 2]
       --shard-count <SHARD_COUNT>
-          Configure the number of shards [default: 1]
+          Configure the number of shards [default: 3]
       --replication-factor <REPLICATION_FACTOR>
           Replication factor for collections [default: 1]
       --write-consistency-factor <WRITE_CONSISTENCY_FACTOR>
@@ -56,7 +56,7 @@ Options:
       --shutdown-on-error
           Whether to shutdown qdrant on error (use false to investigate deadlocks)
       --cpu-quota <CPU_QUOTA>
-              CPU quotas in percent for the Qdrant binary
+          CPU quotas in percent for the Qdrant binary
   -h, --help
           Print help
   -V, --version
