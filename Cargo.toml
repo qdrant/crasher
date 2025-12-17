@@ -26,4 +26,4 @@ env_logger = "0.11.8"
 serde_json = "1.0.145"
 uuid = { version = "1.19.0", features = ["v4", "serde"] }
 tonic = "0.12.3"
-reqwest = { version = "0.12.25", features = ["json"] } # for snapshot restore
+reqwest = { version = "0.12.26", features = ["json"] } # for snapshot restore
