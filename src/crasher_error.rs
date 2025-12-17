@@ -25,6 +25,12 @@ impl From<reqwest::Error> for CrasherError {
     }
 }
 
+impl From<serde_json::Error> for CrasherError {
+    fn from(e: serde_json::Error) -> Self {
+        CrasherError::Client(e.into())
+    }
+}
+
 impl From<qdrant_client::QdrantError> for CrasherError {
     fn from(err: qdrant_client::QdrantError) -> Self {
         // Network error and timeout are detected as transient errors

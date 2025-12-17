@@ -86,6 +86,9 @@ impl Workload {
                 }
                 Err(Invariant(msg)) => {
                     log::error!("Workload run failed due to an invariant violation!\n{msg}");
+                    // Uncomment to display telemetry for debugging
+                    //let telemetry = get_telemetry().await.unwrap_or_default();
+                    //log::error!("Telemetry:\n{}", telemetry);
                     // send stop signal to the main thread
                     self.stopped.store(true, Ordering::Relaxed);
                     log::info!("Stopping the workload...");
@@ -363,6 +366,11 @@ impl Workload {
     ) -> Result<(), CrasherError> {
         // fetch all existing points (rely on numeric ids!)
         let all_ids: Vec<_> = (1..current_count).collect();
+
+        // track all errors
+        let mut missing_points_errors: Vec<usize> = Vec::new();
+        let mut malformed_points_errors: Vec<String> = Vec::new();
+
         // by batches to not overload the server
         for ids in all_ids.chunks(current_count.min(1000)) {
             let response = retrieve_points(client, &self.collection_name, ids).await?;
@@ -381,66 +389,88 @@ impl Workload {
                 let missing_ids = ids
                     .iter()
                     .filter(|&id| !response_ids.contains(id))
+                    .cloned()
                     .collect::<Vec<_>>();
-                return Err(Invariant(format!(
-                    "{} missing points detected\n{:?}",
-                    missing_ids.len(),
-                    missing_ids
-                )));
-            } else {
-                // check points are welformed
-                for point in &response.result {
-                    let point_id = point.id.as_ref().expect("Point id should be present");
-                    // wellformed vectors
-                    if let Some(vectors) = &point.vectors {
-                        if let Some(vector) = &vectors.vectors_options {
-                            match vector {
-                                VectorsOptions::Vector(anonymous) => {
-                                    return Err(Invariant(format!(
-                                        "Vector {point_id:?} should be named: {anonymous:?}"
-                                    )));
+                missing_points_errors.extend_from_slice(&missing_ids);
+            }
+            // check points are welformed
+            for point in &response.result {
+                let point_id = point.id.as_ref().expect("Point id should be present");
+                // wellformed vectors
+                if let Some(vectors) = &point.vectors {
+                    if let Some(vector) = &vectors.vectors_options {
+                        match vector {
+                            VectorsOptions::Vector(anonymous) => {
+                                malformed_points_errors.push(format!(
+                                    "Vector {point_id:?} should be named: {anonymous:?}"
+                                ));
+                            }
+                            VectorsOptions::Vectors(named_vectors) => {
+                                if named_vectors.vectors.is_empty() {
+                                    malformed_points_errors.push(format!(
+                                        "Named vector {point_id:?} should not be empty"
+                                    ));
                                 }
-                                VectorsOptions::Vectors(named_vectors) => {
-                                    if named_vectors.vectors.is_empty() {
-                                        return Err(Invariant(format!(
-                                            "Named vector {point_id:?} should not be empty"
-                                        )));
+                                for (name, vector) in &named_vectors.vectors {
+                                    if vector.data.is_empty() {
+                                        malformed_points_errors.push(format!(
+                                            "Vector {name} with id {point_id:?} should not be empty"
+                                        ));
                                     }
-                                    for (name, vector) in &named_vectors.vectors {
-                                        if vector.data.is_empty() {
-                                            return Err(Invariant(format!(
-                                                "Vector {name} with id {point_id:?} should not be empty"
-                                            )));
-                                        }
-                                        if check_zeroed_vector(vector) {
-                                            return Err(Invariant(format!(
-                                                "Vector {name} with id {point_id:?} is zeroed"
-                                            )));
-                                        }
+                                    if check_zeroed_vector(vector) {
+                                        malformed_points_errors.push(format!(
+                                            "Vector {name} with id {point_id:?} is zeroed"
+                                        ));
                                     }
                                 }
                             }
                         }
-                    } else {
-                        return Err(Invariant(format!(
-                            "Vector {point_id:?} should be present in the response"
-                        )));
                     }
-                    // check mandatory payload keys
-                    if !point.payload.contains_key(MANDATORY_PAYLOAD_BOOL_KEY) {
-                        return Err(Invariant(format!(
-                            "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_BOOL_KEY} in storage"
-                        )));
-                    }
-                    if !point.payload.contains_key(MANDATORY_PAYLOAD_TIMESTAMP_KEY) {
-                        return Err(Invariant(format!(
-                            "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_TIMESTAMP_KEY} in storage"
-                        )));
-                    }
+                } else {
+                    malformed_points_errors.push(format!(
+                        "Vector {point_id:?} should be present in the response"
+                    ));
+                }
+                // check mandatory payload keys
+                if !point.payload.contains_key(MANDATORY_PAYLOAD_BOOL_KEY) {
+                    malformed_points_errors.push(format!(
+                        "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_BOOL_KEY} in storage"
+                    ));
+                }
+                if !point.payload.contains_key(MANDATORY_PAYLOAD_TIMESTAMP_KEY) {
+                    malformed_points_errors.push(format!(
+                        "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_TIMESTAMP_KEY} in storage"
+                    ));
                 }
             }
         }
-        Ok(())
+
+        // merge all violations found
+        let mut errors_found = Vec::new();
+        if !missing_points_errors.is_empty() {
+            errors_found.push(format!(
+                "{} missing points detected: {:?}",
+                missing_points_errors.len(),
+                missing_points_errors
+            ));
+        }
+
+        if !malformed_points_errors.is_empty() {
+            errors_found.push(format!(
+                "{} malformed points detected: {:?}",
+                malformed_points_errors.len(),
+                malformed_points_errors
+            ));
+        }
+
+        if errors_found.is_empty() {
+            Ok(())
+        } else {
+            let errors_rendered = errors_found.join("/n  - ");
+            Err(Invariant(format!(
+                "data inconsistency found:\n  - {errors_rendered}",
+            )))
+        }
     }
 
     /// Validate data consistency from the client side

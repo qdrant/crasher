@@ -20,6 +20,7 @@ use qdrant_client::qdrant::{
 };
 use rand::Rng;
 use reqwest::Client;
+use serde_json::Value;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -522,19 +523,21 @@ pub async fn list_collection_snapshots(
         .collect::<Vec<String>>())
 }
 
+// TODO add to config
+const HTTP_PORT: u32 = 6333;
+
 /// Restore local collection snapshot
 pub async fn restore_collection_snapshot(
     collection_name: &str,
     snapshot_name: &str,
 ) -> Result<(), CrasherError> {
-    // TODO add to config
-    let port = 6333;
-    let url = format!("http://localhost:{port}/collections/{collection_name}/snapshots/recover");
+    let url =
+        format!("http://localhost:{HTTP_PORT}/collections/{collection_name}/snapshots/recover");
 
     // setup snapshot location
     let body = json!({
         "location": format!(
-            "http://localhost:{port}/collections/{collection_name}/snapshots/{snapshot_name}"
+            "http://localhost:{HTTP_PORT}/collections/{collection_name}/snapshots/{snapshot_name}"
         )
     });
 
@@ -547,4 +550,20 @@ pub async fn restore_collection_snapshot(
         ));
     }
     Ok(())
+}
+
+#[allow(dead_code)]
+pub async fn get_telemetry() -> Result<String, CrasherError> {
+    let url = format!("http://localhost:{HTTP_PORT}/telemetry?details_level=10");
+    let client = Client::new();
+    let response = client.get(&url).send().await?;
+    if !response.status().is_success() {
+        return Err(CrasherError::Invariant(
+            "Failed to get telemetry".to_string(),
+        ));
+    }
+    let response_body = response.text().await?;
+    let json: Value = serde_json::from_str(&response_body)?;
+    let pretty = serde_json::to_string_pretty(&json)?;
+    Ok(pretty)
 }
