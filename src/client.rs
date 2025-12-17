@@ -543,11 +543,12 @@ pub async fn restore_collection_snapshot(
 
     let client = Client::new();
     let response = client.put(&url).json(&body).send().await?;
-
-    if !response.status().is_success() {
-        return Err(CrasherError::Invariant(
-            "Invalid snapshot restore".to_string(),
-        ));
+    let status = response.status();
+    if !status.is_success() {
+        let response_text = response.text().await?;
+        return Err(CrasherError::Invariant(format!(
+            "Invalid snapshot restore - status:{status} '{response_text}'"
+        )));
     }
     Ok(())
 }
