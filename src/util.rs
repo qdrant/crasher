@@ -1,7 +1,13 @@
 use anyhow::Context as _;
 use futures::{FutureExt as _, TryStreamExt as _, future::BoxFuture};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 use std::path::PathBuf;
 use tokio::fs;
+
+pub fn create_rngs(requested_seed: Option<u64>) -> (u64, SmallRng, SmallRng) {
+    let s = requested_seed.unwrap_or_else(|| rand::rng().random::<u64>());
+    (s, SmallRng::seed_from_u64(s), SmallRng::seed_from_u64(s))
+}
 
 pub fn copy_dir(
     src: impl Into<PathBuf>,

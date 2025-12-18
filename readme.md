@@ -57,6 +57,8 @@ Options:
           Whether to shutdown qdrant on error (use false to investigate deadlocks)
       --cpu-quota <CPU_QUOTA>
           CPU quotas in percent for the Qdrant binary
+      --fixed-seed <FIXED_SEED>
+          Seed for internal RNG
   -h, --help
           Print help
   -V, --version

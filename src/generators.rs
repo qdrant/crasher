@@ -60,7 +60,7 @@ pub struct TestNamedVectors {
 
 // TODO unit test names
 impl TestNamedVectors {
-    pub fn new(duplication_factor: usize, vec_dim: usize) -> Self {
+    pub fn new(duplication_factor: u32, vec_dim: u32) -> Self {
         let mut sparse_vectors = HashMap::new();
         let mut dense_vectors = HashMap::new();
         let mut multi_vectors = HashMap::new();
@@ -442,12 +442,12 @@ impl TestNamedVectors {
     }
 }
 
-pub fn random_keyword(rng: &mut impl Rng, num_variants: usize) -> String {
+pub fn random_keyword(rng: &mut impl Rng, num_variants: u32) -> String {
     let variant = rng.random_range(0..num_variants);
     format!("keyword_{variant}")
 }
 
-pub fn random_payload(rng: &mut impl Rng, keywords: Option<usize>) -> Payload {
+pub fn random_payload(rng: &mut impl Rng, keywords: Option<u32>) -> Payload {
     let mut payload = Payload::new();
     if let Some(keyword_variants) = keywords
         && keyword_variants > 0
@@ -469,7 +469,7 @@ pub fn random_payload(rng: &mut impl Rng, keywords: Option<usize>) -> Payload {
     payload
 }
 
-pub fn random_filter(rng: &mut impl Rng, keywords: Option<usize>) -> Option<Filter> {
+pub fn random_filter(rng: &mut impl Rng, keywords: Option<u32>) -> Option<Filter> {
     let mut filter = Filter {
         should: vec![],
         must: vec![],
@@ -488,7 +488,7 @@ pub fn random_filter(rng: &mut impl Rng, keywords: Option<usize>) -> Option<Filt
     if have_any { Some(filter) } else { None }
 }
 
-pub fn random_dense_vector(rng: &mut impl Rng, name: &str, dim: usize) -> Vec<f32> {
+pub fn random_dense_vector(rng: &mut impl Rng, name: &str, dim: u32) -> Vec<f32> {
     let range = if name.contains("uint8") {
         // uint8 vectors get mapped to integers. If we use regular range it is very possible we get a
         // zeroed vector, which we are asserting should not happen
@@ -504,18 +504,18 @@ pub fn random_dense_vector(rng: &mut impl Rng, name: &str, dim: usize) -> Vec<f3
     res
 }
 
-pub fn random_sparse_vector(rng: &mut impl Rng, max_size: usize, sparsity: f64) -> Vec<(u32, f32)> {
+pub fn random_sparse_vector(rng: &mut impl Rng, max_size: u32, sparsity: f32) -> Vec<(u32, f32)> {
     let size = rng.random_range(1..=max_size);
     // (index, value)
-    let mut pairs = Vec::with_capacity(size);
+    let mut pairs = Vec::with_capacity(size as usize);
     for i in 1..=size {
         // probability of skipping a dimension to make the vectors sparse
-        let skip = !rng.random_bool(sparsity);
+        let skip = !rng.random_bool(sparsity as f64);
         if skip {
             continue;
         }
         // Only positive values are generated to make sure to hit the pruning path.
-        pairs.push((i as u32, rng.random_range(0.0..10.0) as f32));
+        pairs.push((i, rng.random_range(0.0..10.0) as f32));
     }
     if pairs.is_empty() {
         // make sure at least one dimension is present

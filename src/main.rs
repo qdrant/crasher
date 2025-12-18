@@ -9,6 +9,7 @@ mod workload;
 use crate::args::Args;
 use crate::client::wait_server_ready;
 use crate::process::ProcessManager;
+use crate::util::create_rngs;
 use crate::workload::Workload;
 use clap::Parser;
 use env_logger::Target;
@@ -63,8 +64,8 @@ async fn main() {
                     );
 
                     let collection_name = COLLECTION_NAME;
-
                     let crash_lock = Arc::new(tokio::sync::Mutex::new(()));
+                    let (rng_seed, mut workload_rng, mut choas_rng) = create_rngs(args.rng_seed);
 
                     // workload task
                     let client_worker = client.clone();
@@ -75,9 +76,13 @@ async fn main() {
                         args.duplication_factor,
                         args.points_count,
                         args.vector_dimension,
+                        rng_seed,
                     );
+
                     let workload_task = tokio::spawn(async move {
-                        workload.work(&client_worker, args.clone()).await;
+                        workload
+                            .work(&client_worker, args.clone(), &mut workload_rng)
+                            .await;
                     });
 
                     // get started a bit before chaos
@@ -90,8 +95,9 @@ async fn main() {
                                 stopped.clone(),
                                 crash_lock.clone(),
                                 &client.clone(),
-                                crash_probability,
+                                crash_probability as f64,
                                 sleep_duration_between_crash_sec,
+                                &mut choas_rng,
                             )
                             .await;
                     });

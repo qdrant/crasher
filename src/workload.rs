@@ -8,8 +8,7 @@ use qdrant_client::qdrant::{
     KeywordIndexParamsBuilder, QueryBatchResponse, ScrollPointsBuilder, TextIndexParamsBuilder,
     TokenizerType, UuidIndexParamsBuilder, VectorOutput, WriteOrdering, vector_output,
 };
-use rand::SeedableRng;
-use rand::rngs::SmallRng;
+use rand::Rng;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -35,13 +34,14 @@ use crate::generators::{
 pub struct Workload {
     collection_name: String,
     test_named_vectors: TestNamedVectors,
-    query_count: usize,
-    points_count: usize,
-    vec_dim: usize,
-    payload_count: usize,
+    query_count: u32,
+    points_count: u32,
+    vec_dim: u32,
+    payload_count: u32,
     write_ordering: Option<WriteOrdering>,
     stopped: Arc<AtomicBool>,
     crash_lock: Arc<tokio::sync::Mutex<()>>, // take lock to prevent crash
+    rng_seed: u64,
 }
 
 impl Workload {
@@ -49,9 +49,10 @@ impl Workload {
         collection_name: &str,
         stopped: Arc<AtomicBool>,
         crash_lock: Arc<tokio::sync::Mutex<()>>,
-        duplication_factor: usize,
-        points_count: usize,
-        vec_dim: usize,
+        duplication_factor: u32,
+        points_count: u32,
+        vec_dim: u32,
+        rng_seed: u64,
     ) -> Self {
         let payload_count = 1;
         let query_count = 2;
@@ -67,17 +68,18 @@ impl Workload {
             write_ordering,
             stopped,
             crash_lock,
+            rng_seed,
         }
     }
 }
 
 impl Workload {
-    pub async fn work(&self, client: &Qdrant, args: Arc<Args>) {
+    pub async fn work(&self, client: &Qdrant, args: Arc<Args>, rng: &mut impl Rng) {
         loop {
             if self.stopped.load(Ordering::Relaxed) {
                 break;
             }
-            let run = self.run(client, args.clone()).await;
+            let run = self.run(client, args.clone(), rng).await;
             match run {
                 Ok(()) => {
                     log::info!("Workload run finished");
@@ -87,7 +89,10 @@ impl Workload {
                     break;
                 }
                 Err(Invariant(msg)) => {
-                    log::error!("Workload run failed due to an invariant violation!\n{msg}");
+                    log::error!(
+                        "Workload run failed due to an invariant violation!(rng_seed:{}) \n{msg}",
+                        self.rng_seed
+                    );
                     // Uncomment to display telemetry for debugging
                     //let telemetry = get_telemetry().await.unwrap_or_default();
                     //log::error!("Telemetry:\n{}", telemetry);
@@ -116,8 +121,12 @@ impl Workload {
         }
     }
 
-    pub async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CrasherError> {
-        let mut rng = SmallRng::from_os_rng();
+    pub async fn run(
+        &self,
+        client: &Qdrant,
+        args: Arc<Args>,
+        rng: &mut impl Rng,
+    ) -> Result<(), CrasherError> {
         log::info!("Starting workload...");
         // create and populate collection if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
@@ -300,7 +309,7 @@ impl Workload {
             &self.test_named_vectors,
             None,
             self.stopped.clone(),
-            &mut rng,
+            rng,
         )
         .await?;
 
@@ -323,7 +332,7 @@ impl Workload {
                 point_id as u64,
                 self.payload_count,
                 self.write_ordering,
-                &mut rng,
+                rng,
             )
             .await?;
         }
@@ -345,7 +354,7 @@ impl Workload {
                 self.payload_count,
                 true,
                 10,
-                &mut rng,
+                rng,
             )
             .await?;
             check_search_result(results)?;

@@ -15,40 +15,40 @@ pub struct Args {
     pub exec_path: String,
     /// Probability to kill running instance
     #[arg(long, default_value_t = 0.3)]
-    pub crash_probability: f64,
+    pub crash_probability: f32,
     /// The time in second to sleep between crashes attempt
     #[arg(long, default_value_t = 5)]
-    pub sleep_duration_between_crash_sec: usize,
+    pub sleep_duration_between_crash_sec: u32,
     /// Qdrant gRPC service URIs (can be used several times to specify several URIs)
     #[arg(long, default_value = "http://localhost:6334")]
     pub uris: Vec<String>,
     /// Number of points to generate
     #[arg(long, default_value_t = 5_000)]
-    pub points_count: usize,
+    pub points_count: u32,
     /// Dimension of generated vectors
     #[arg(long, default_value_t = 10)]
-    pub vector_dimension: usize,
+    pub vector_dimension: u32,
     /// Configure the flush interval for collections
     #[arg(long, default_value_t = 5)]
-    pub flush_interval_sec: usize,
+    pub flush_interval_sec: u32,
     /// Configure the number of segment
     #[arg(long, default_value_t = 2)]
-    pub segment_count: usize,
+    pub segment_count: u32,
     /// Configure the number of shards
     #[arg(long, default_value_t = 3)]
-    pub shard_count: usize,
+    pub shard_count: u32,
     /// Replication factor for collections
     #[arg(long, default_value_t = 1)]
-    pub replication_factor: usize,
+    pub replication_factor: u32,
     /// Writing consistency factor for collections
     #[arg(long, default_value_t = 1)]
-    pub write_consistency_factor: usize,
+    pub write_consistency_factor: u32,
     /// Optimizer indexing threshold
     #[arg(long)]
-    pub indexing_threshold: Option<usize>,
+    pub indexing_threshold: Option<u32>,
     /// Maximum size (in KiloBytes) of vectors to store in-memory per segment.
     #[arg(long)]
-    pub memmap_threshold: Option<usize>,
+    pub memmap_threshold: Option<u32>,
     /// Timeout of gRPC client
     #[arg(long, default_value_t = 10_000)]
     pub grpc_timeout_ms: usize,
@@ -60,11 +60,14 @@ pub struct Args {
     pub only_sparse: bool,
     /// Duplication factor for generating additional named vectors
     #[arg(long, default_value_t = 2)]
-    pub duplication_factor: usize,
+    pub duplication_factor: u32,
     /// Whether to shutdown qdrant on error (use false to investigate deadlocks)
     #[arg(long, default_value_t = true)]
     pub shutdown_on_error: bool,
     /// CPU quotas in percent for the Qdrant binary
     #[arg(long)]
-    pub cpu_quota: Option<usize>,
+    pub cpu_quota: Option<u32>,
+    /// Seed for internal RNG
+    #[arg(long)]
+    pub rng_seed: Option<u64>,
 }

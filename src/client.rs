@@ -140,8 +140,8 @@ pub async fn query_batch_points(
     collection_name: &str,
     test_named_vectors: &TestNamedVectors,
     only_sparse: bool,
-    vec_dim: usize,
-    payload_count: usize,
+    vec_dim: u32,
+    payload_count: u32,
     with_vector: bool,
     limit: u64,
     rng: &mut impl Rng,
@@ -272,9 +272,9 @@ pub async fn create_collection(
 
     let mut request = CreateCollectionBuilder::new(collection_name)
         .sparse_vectors_config(sparse_vectors_config)
-        .replication_factor(args.replication_factor as u32)
-        .write_consistency_factor(args.write_consistency_factor as u32)
-        .shard_number(args.shard_count as u32)
+        .replication_factor(args.replication_factor)
+        .write_consistency_factor(args.write_consistency_factor)
+        .shard_number(args.shard_count)
         .optimizers_config(OptimizersConfigDiff {
             deleted_threshold: None,
             vacuum_min_vector_number: None,
@@ -303,9 +303,9 @@ pub async fn create_collection(
 pub async fn insert_points_batch(
     client: &Qdrant,
     collection_name: &str,
-    points_count: usize,
-    vec_dim: usize,
-    payload_count: usize,
+    points_count: u32,
+    vec_dim: u32,
+    payload_count: u32,
     mandatory_payload: bool,
     only_sparse_vectors: bool,
     test_named_vectors: &TestNamedVectors,
@@ -334,7 +334,7 @@ pub async fn insert_points_batch(
         } else {
             (false, batch_size)
         };
-        let mut points = Vec::with_capacity(batch_size);
+        let mut points = Vec::with_capacity(batch_size as usize);
         let batch_base_id = batch_id as u64 * max_batch_size as u64;
         for i in 0..batch_size {
             let idx = batch_base_id + i as u64;
@@ -419,7 +419,7 @@ pub async fn set_payload(
     client: &Qdrant,
     collection_name: &str,
     point_id: u64,
-    payload_count: usize,
+    payload_count: u32,
     write_ordering: Option<WriteOrdering>,
     rng: &mut impl Rng,
 ) -> Result<(), CrasherError> {

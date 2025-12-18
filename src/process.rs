@@ -3,8 +3,7 @@ use crate::client::wait_server_ready;
 use crate::util;
 use anyhow::Context as _;
 use qdrant_client::Qdrant;
-use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 use std::collections::VecDeque;
 use std::io;
 use std::process::exit;
@@ -19,7 +18,7 @@ pub fn start_process(
     working_dir_path: &str,
     exec_path: &str,
     kill_on_drop: bool, // kill child process if parent is dropped
-    cpu_quota: Option<usize>,
+    cpu_quota: Option<u32>,
 ) -> io::Result<Child> {
     let mut cmd = if let Some(cpu_quota) = cpu_quota {
         let mut c = Command::new("systemd-run");
@@ -54,7 +53,7 @@ pub struct ProcessManager {
     pub backup_dirs: VecDeque<String>,
     pub child_process: Child,
     pub kill_on_drop: bool,
-    pub cpu_quota: Option<usize>,
+    pub cpu_quota: Option<u32>,
 }
 
 impl ProcessManager {
@@ -74,7 +73,7 @@ impl ProcessManager {
         working_dir: &str,
         binary_path: &str,
         kill_on_drop: bool,
-        cpu_quota: Option<usize>,
+        cpu_quota: Option<u32>,
     ) -> io::Result<Self> {
         let child = start_process(working_dir, binary_path, kill_on_drop, cpu_quota)?;
 
@@ -127,9 +126,9 @@ impl ProcessManager {
         crash_lock: Arc<tokio::sync::Mutex<()>>,
         client: &Qdrant,
         crash_probability: f64,
-        sleep_duration_between_crash_sec: usize,
+        sleep_duration_between_crash_sec: u32,
+        rng: &mut impl Rng,
     ) {
-        let mut rng = SmallRng::from_os_rng();
         loop {
             if stopped.load(Ordering::Relaxed) {
                 break;
