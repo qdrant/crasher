@@ -19,7 +19,7 @@ use tokio::time::sleep;
 use crate::args::Args;
 use crate::client::{
     create_collection, create_collection_snapshot, create_field_index, delete_collection_snapshot,
-    delete_points, get_collection_info, get_exact_points_count, insert_points_batch,
+    delete_points, get_collection_info, get_exact_points_count, get_telemetry, insert_points_batch,
     list_collection_snapshots, query_batch_points, restore_collection_snapshot, retrieve_points,
     set_payload,
 };
@@ -54,8 +54,8 @@ impl Workload {
         vec_dim: u32,
         rng_seed: u64,
     ) -> Self {
-        let payload_count = 1;
-        let query_count = 2;
+        let payload_count = 5; // hardcoded
+        let query_count = 2; //hardcoded
         let test_named_vectors = TestNamedVectors::new(duplication_factor, vec_dim);
         let write_ordering = None; // default
         Workload {
@@ -191,8 +191,11 @@ impl Workload {
                 &self.collection_name,
                 TEXT_PAYLOAD_KEY,
                 FieldType::Text,
-                TextIndexParamsBuilder::new(TokenizerType::Word)
-                    //.phrase_matching(true)
+                TextIndexParamsBuilder::new(TokenizerType::Multilingual)
+                    .ascii_folding(true)
+                    .snowball_stemmer("english".to_string())
+                    .stopwords_language("english".to_string())
+                    .phrase_matching(true)
                     .on_disk(true),
             )
             .await?;
@@ -359,6 +362,9 @@ impl Workload {
             .await?;
             check_search_result(&results)?;
         }
+
+        log::info!("Run: get full telemetry");
+        let _telemetry = get_telemetry().await?;
 
         // Stop ongoing snapshotting task
         snapshotting_handle.abort();

@@ -553,7 +553,6 @@ pub async fn restore_collection_snapshot(
     Ok(())
 }
 
-#[allow(dead_code)]
 pub async fn get_telemetry() -> Result<String, CrasherError> {
     let url = format!("http://localhost:{HTTP_PORT}/telemetry?details_level=10");
     let client = Client::new();

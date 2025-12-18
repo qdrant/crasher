@@ -20,13 +20,16 @@ pub const DENSE_VECTOR_NAME_UINT8: &str = "dense-vector-uint8";
 pub const DENSE_VECTOR_NAME_FLOAT16: &str = "dense-vector-float16";
 pub const DENSE_VECTOR_NAME_SQ: &str = "dense-vector-sq";
 pub const DENSE_VECTOR_NAME_PQ: &str = "dense-vector-pq";
-pub const DENSE_VECTOR_NAME_BQ: &str = "dense-vector-bq";
+pub const DENSE_VECTOR_NAME_BQ_1B: &str = "dense-vector-bq-1b";
+pub const DENSE_VECTOR_NAME_BQ_1HB: &str = "dense-vector-bq-1Hb";
+pub const DENSE_VECTOR_NAME_BQ_2B: &str = "dense-vector-bq-2b";
 
 /// Sparse vectors base names
 pub const SPARSE_VECTOR_NAME_INDEX_DISK: &str = "sparse-vector-index-disk";
 pub const SPARSE_VECTOR_NAME_INDEX_MEMORY: &str = "sparse-vector-index-memory";
 pub const SPARSE_VECTOR_NAME_UINT8: &str = "sparse-vector-uint8";
 pub const SPARSE_VECTOR_NAME_FLOAT16: &str = "sparse-vector-float16";
+pub const SPARSE_VECTOR_NAME_IDF: &str = "sparse-vector-IDF";
 
 /// Multi vectors base names
 pub const MULTI_VECTOR_NAME_ON_DISK: &str = "multi-dense-vector-on-disk";
@@ -37,11 +40,12 @@ pub const MULTI_VECTOR_NAME_SQ: &str = "multi-dense-vector-sq";
 pub const MULTI_VECTOR_NAME_PQ: &str = "multi-dense-vector-pq";
 pub const MULTI_VECTOR_NAME_BQ: &str = "multi-dense-vector-bq";
 
-/// Payload keys
+/// Mandatory payload keys (present on all points)
 pub const MANDATORY_PAYLOAD_TIMESTAMP_KEY: &str = "mandatory-payload-timestamp";
 pub const MANDATORY_PAYLOAD_BOOL_KEY: &str = "mandatory-payload-bool";
 // TODO add one mandatory key per index type
 
+// Indexed payload keys
 pub const KEYWORD_PAYLOAD_KEY: &str = "crasher-payload-keyword";
 pub const INTEGER_PAYLOAD_KEY: &str = "crasher-payload-integer";
 pub const FLOAT_PAYLOAD_KEY: &str = "crasher-payload-float";
@@ -188,9 +192,55 @@ impl TestNamedVectors {
             );
         }
 
-        // dense vectors BQ
+        // dense vectors BQ 1bit
         for i in 1..=duplication_factor {
-            let name = format!("{DENSE_VECTOR_NAME_BQ}-{i}");
+            let name = format!("{DENSE_VECTOR_NAME_BQ_1B}-{i}");
+
+            let bq_builder =
+                BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::OneBit);
+
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Binary(bq_builder.build())),
+                    }),
+                    hnsw_config,
+                    on_disk: Some(true), // on disk
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors BQ 1 and half bit
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_BQ_1HB}-{i}");
+
+            let bq_builder = BinaryQuantizationBuilder::new(false)
+                .encoding(BinaryQuantizationEncoding::OneAndHalfBits);
+
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Binary(bq_builder.build())),
+                    }),
+                    hnsw_config,
+                    on_disk: Some(true), // on disk
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors BQ 2bits
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_BQ_2B}-{i}");
 
             let bq_builder =
                 BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::TwoBits);
@@ -271,6 +321,22 @@ impl TestNamedVectors {
                         datatype: Some(3),   // Float16
                     }),
                     modifier: None,
+                },
+            );
+        }
+
+        // sparse vector IDF
+        for i in 1..=duplication_factor {
+            let name = format!("{SPARSE_VECTOR_NAME_IDF}-{i}");
+            sparse.insert(
+                name.clone(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(true), // on disk
+                        datatype: Some(1),   // Float32
+                    }),
+                    modifier: Some(2), // IDF
                 },
             );
         }
@@ -447,6 +513,14 @@ pub fn random_keyword(rng: &mut impl Rng, num_variants: u32) -> String {
     format!("keyword_{variant}")
 }
 
+const WORDS: [&str; 8] = ["the", "quick", "fox", "jumps", "over", "the", "lazy", "dog"];
+
+pub fn random_sentence(rng: &mut impl Rng, num_variants: u32) -> String {
+    let variant = rng.random_range(0..num_variants);
+    let words: Vec<_> = WORDS.iter().take(variant as usize).cloned().collect();
+    words.join(" ")
+}
+
 pub fn random_payload(rng: &mut impl Rng, keywords: Option<u32>) -> Payload {
     let mut payload = Payload::new();
     if let Some(keyword_variants) = keywords
@@ -461,7 +535,7 @@ pub fn random_payload(rng: &mut impl Rng, keywords: Option<u32>) -> Payload {
             "lon": rng.random_range(-180.0..180.0),
         });
         payload.insert(GEO_PAYLOAD_KEY, geo_value);
-        payload.insert(TEXT_PAYLOAD_KEY, random_keyword(rng, keyword_variants));
+        payload.insert(TEXT_PAYLOAD_KEY, random_sentence(rng, keyword_variants));
         payload.insert(BOOL_PAYLOAD_KEY, rng.random_bool(0.5));
         payload.insert(DATETIME_PAYLOAD_KEY, chrono::Utc::now().to_rfc3339());
         payload.insert(UUID_PAYLOAD_KEY, uuid::Uuid::new_v4().to_string());
