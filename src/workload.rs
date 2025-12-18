@@ -464,7 +464,7 @@ impl Workload {
         let mut errors_found = Vec::new();
         if !missing_points_errors.is_empty() {
             errors_found.push(format!(
-                "{} missing points detected: {:?}",
+                "detected {} missing points:\n{:?}",
                 missing_points_errors.len(),
                 missing_points_errors
             ));
@@ -472,7 +472,7 @@ impl Workload {
 
         if !malformed_points_errors.is_empty() {
             errors_found.push(format!(
-                "{} malformed points detected: {:?}",
+                "detected {} malformed points:\n{:?}",
                 malformed_points_errors.len(),
                 malformed_points_errors
             ));
@@ -482,9 +482,7 @@ impl Workload {
             Ok(())
         } else {
             let errors_rendered = errors_found.join("/n  - ");
-            Err(Invariant(format!(
-                "data inconsistency found:\n  - {errors_rendered}",
-            )))
+            Err(Invariant(errors_rendered.to_string()))
         }
     }
 
@@ -497,13 +495,37 @@ impl Workload {
         client: &Qdrant,
         current_count: usize,
     ) -> Result<(), CrasherError> {
+        let mut errors = Vec::new();
+
         // check all points and vector present in storage
-        self.check_points_consistency(client, current_count).await?;
+        match self.check_points_consistency(client, current_count).await {
+            Err(Invariant(e)) => errors.push(format!("Inconsistent storage: {e}")),
+            Err(e) => return Err(e),
+            Ok(()) => (),
+        }
+
         // check mandatory timestamp payload key via null index
-        self.check_filter_null_index(client, current_count).await?;
+        match self.check_filter_null_index(client, current_count).await {
+            Err(Invariant(e)) => errors.push(format!("Inconsistent Null Index: {e}")),
+            Err(e) => return Err(e),
+            Ok(()) => (),
+        }
+
         // check mandatory bool payload key via match query
-        self.check_filter_bool_index(client, current_count).await?;
-        Ok(())
+        match self.check_filter_bool_index(client, current_count).await {
+            Err(Invariant(e)) => errors.push(format!("Inconsistent Bool Index: {e}")),
+            Err(e) => return Err(e),
+            Ok(()) => (),
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            let full_report = errors.join("\n---\n");
+            Err(Invariant(format!(
+                "Data inconsistencies found out of {current_count} points:\n{full_report}"
+            )))
+        }
     }
 
     async fn check_filter_null_index(
@@ -530,7 +552,7 @@ impl Workload {
             Ok(())
         } else {
             Err(Invariant(format!(
-                "Detected {} points missing the '{}' payload key when matching for null values!\n{:?}",
+                "detected {} points missing the '{}' payload key when matching for null values\n{:?}",
                 points.len(),
                 MANDATORY_PAYLOAD_TIMESTAMP_KEY,
                 points,
@@ -574,8 +596,7 @@ impl Workload {
             Ok(())
         } else {
             Err(Invariant(format!(
-                "Out of {}, detected {} points missing the '{}: true' when matching payload!\n{:?}",
-                current_count,
+                "detected {} points missing the '{}: true' when matching payload\n{:?}",
                 missing_points.len(),
                 MANDATORY_PAYLOAD_BOOL_KEY,
                 missing_points,
