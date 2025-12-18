@@ -18,7 +18,8 @@ use qdrant_client::qdrant::{
     ReplicaState, SetPayloadPointsBuilder, SparseVectorConfig, UpsertPointsBuilder, Vector,
     VectorInput, VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
-use rand::Rng;
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
 use reqwest::Client;
 use serde_json::Value;
 use serde_json::json;
@@ -203,7 +204,7 @@ pub async fn query_batch_points(
         }
         // multi dense
         for multi_dense_name in test_named_vectors.multi_vector_names() {
-            let vec_count = rand::rng().random_range(1..5);
+            let vec_count = SmallRng::from_os_rng().random_range(1..5);
             let multi_vector: Vec<_> = (0..vec_count)
                 .map(|_| random_dense_vector(&multi_dense_name, vec_dim))
                 .collect();
@@ -351,7 +352,7 @@ pub async fn insert_points_batch(
                 }
                 // multi dense
                 for name in test_named_vectors.multi_vector_names() {
-                    let vec_count = rand::rng().random_range(1..5);
+                    let vec_count = SmallRng::from_os_rng().random_range(1..5);
                     let multi_vector: Vec<Vec<_>> = (0..vec_count)
                         .map(|_| random_dense_vector(&name, vec_dim))
                         .collect();

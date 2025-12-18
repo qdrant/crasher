@@ -3,7 +3,8 @@ use crate::client::wait_server_ready;
 use crate::util;
 use anyhow::Context as _;
 use qdrant_client::Qdrant;
-use rand::Rng;
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
 use std::collections::VecDeque;
 use std::io;
 use std::process::exit;
@@ -134,7 +135,7 @@ impl ProcessManager {
             }
 
             let drawn = {
-                let mut rng = rand::rng();
+                let mut rng = SmallRng::from_os_rng();
                 rng.random_bool(crash_probability)
             };
             if drawn {

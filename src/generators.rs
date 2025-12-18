@@ -8,7 +8,8 @@ use qdrant_client::qdrant::{
     HnswConfigDiff, MultiVectorConfig, ProductQuantization, QuantizationConfig, ScalarQuantization,
     SparseIndexConfig, SparseVectorParams, VectorParams,
 };
-use rand::Rng;
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
 use serde_json::json;
 use std::collections::HashMap;
 // TODO do not generate vector configuration manually but create all possibility exhaustively
@@ -449,7 +450,7 @@ pub fn random_keyword(rng: &mut impl Rng, num_variants: usize) -> String {
 
 pub fn random_payload(keywords: Option<usize>) -> Payload {
     let mut payload = Payload::new();
-    let mut rng = rand::rng();
+    let mut rng = SmallRng::from_os_rng();
     if let Some(keyword_variants) = keywords
         && keyword_variants > 0
     {
@@ -474,7 +475,7 @@ pub fn random_payload(keywords: Option<usize>) -> Payload {
 }
 
 pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
-    let mut rng = rand::rng();
+    let mut rng = SmallRng::from_os_rng();
     let mut filter = Filter {
         should: vec![],
         must: vec![],
@@ -494,7 +495,7 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
 }
 
 pub fn random_dense_vector(name: &str, dim: usize) -> Vec<f32> {
-    let mut rng = rand::rng();
+    let mut rng = SmallRng::from_os_rng();
     let range = if name.contains("uint8") {
         // uint8 vectors get mapped to integers. If we use regular range it is very possible we get a
         // zeroed vector, which we are asserting should not happen
@@ -511,7 +512,7 @@ pub fn random_dense_vector(name: &str, dim: usize) -> Vec<f32> {
 }
 
 pub fn random_sparse_vector(max_size: usize, sparsity: f64) -> Vec<(u32, f32)> {
-    let mut rng = rand::rng();
+    let mut rng = SmallRng::from_os_rng();
     let size = rng.random_range(1..=max_size);
     // (index, value)
     let mut pairs = Vec::with_capacity(size);
