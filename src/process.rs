@@ -129,16 +129,12 @@ impl ProcessManager {
         crash_probability: f64,
         sleep_duration_between_crash_sec: usize,
     ) {
+        let mut rng = SmallRng::from_os_rng();
         loop {
             if stopped.load(Ordering::Relaxed) {
                 break;
             }
-
-            let drawn = {
-                let mut rng = SmallRng::from_os_rng();
-                rng.random_bool(crash_probability)
-            };
-            if drawn {
+            if rng.random_bool(crash_probability) {
                 let Ok(_crash_lock_guard) = crash_lock.try_lock() else {
                     // give up draw if crashing is not allowed
                     continue;

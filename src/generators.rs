@@ -8,8 +8,7 @@ use qdrant_client::qdrant::{
     HnswConfigDiff, MultiVectorConfig, ProductQuantization, QuantizationConfig, ScalarQuantization,
     SparseIndexConfig, SparseVectorParams, VectorParams,
 };
-use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 use serde_json::json;
 use std::collections::HashMap;
 // TODO do not generate vector configuration manually but create all possibility exhaustively
@@ -448,16 +447,12 @@ pub fn random_keyword(rng: &mut impl Rng, num_variants: usize) -> String {
     format!("keyword_{variant}")
 }
 
-pub fn random_payload(keywords: Option<usize>) -> Payload {
+pub fn random_payload(rng: &mut impl Rng, keywords: Option<usize>) -> Payload {
     let mut payload = Payload::new();
-    let mut rng = SmallRng::from_os_rng();
     if let Some(keyword_variants) = keywords
         && keyword_variants > 0
     {
-        payload.insert(
-            KEYWORD_PAYLOAD_KEY,
-            random_keyword(&mut rng, keyword_variants),
-        );
+        payload.insert(KEYWORD_PAYLOAD_KEY, random_keyword(rng, keyword_variants));
         payload.insert(INTEGER_PAYLOAD_KEY, rng.random_range(0..100));
         payload.insert(FLOAT_PAYLOAD_KEY, rng.random_range(0.0..100.0));
         // create geo payload with random coordinates
@@ -466,7 +461,7 @@ pub fn random_payload(keywords: Option<usize>) -> Payload {
             "lon": rng.random_range(-180.0..180.0),
         });
         payload.insert(GEO_PAYLOAD_KEY, geo_value);
-        payload.insert(TEXT_PAYLOAD_KEY, random_keyword(&mut rng, keyword_variants));
+        payload.insert(TEXT_PAYLOAD_KEY, random_keyword(rng, keyword_variants));
         payload.insert(BOOL_PAYLOAD_KEY, rng.random_bool(0.5));
         payload.insert(DATETIME_PAYLOAD_KEY, chrono::Utc::now().to_rfc3339());
         payload.insert(UUID_PAYLOAD_KEY, uuid::Uuid::new_v4().to_string());
@@ -474,8 +469,7 @@ pub fn random_payload(keywords: Option<usize>) -> Payload {
     payload
 }
 
-pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
-    let mut rng = SmallRng::from_os_rng();
+pub fn random_filter(rng: &mut impl Rng, keywords: Option<usize>) -> Option<Filter> {
     let mut filter = Filter {
         should: vec![],
         must: vec![],
@@ -488,14 +482,13 @@ pub fn random_filter(keywords: Option<usize>) -> Option<Filter> {
 
         filter.must.push(Condition::matches(
             KEYWORD_PAYLOAD_KEY,
-            MatchValue::Keyword(random_keyword(&mut rng, keyword_variants)),
+            MatchValue::Keyword(random_keyword(rng, keyword_variants)),
         ));
     }
     if have_any { Some(filter) } else { None }
 }
 
-pub fn random_dense_vector(name: &str, dim: usize) -> Vec<f32> {
-    let mut rng = SmallRng::from_os_rng();
+pub fn random_dense_vector(rng: &mut impl Rng, name: &str, dim: usize) -> Vec<f32> {
     let range = if name.contains("uint8") {
         // uint8 vectors get mapped to integers. If we use regular range it is very possible we get a
         // zeroed vector, which we are asserting should not happen
@@ -511,8 +504,7 @@ pub fn random_dense_vector(name: &str, dim: usize) -> Vec<f32> {
     res
 }
 
-pub fn random_sparse_vector(max_size: usize, sparsity: f64) -> Vec<(u32, f32)> {
-    let mut rng = SmallRng::from_os_rng();
+pub fn random_sparse_vector(rng: &mut impl Rng, max_size: usize, sparsity: f64) -> Vec<(u32, f32)> {
     let size = rng.random_range(1..=max_size);
     // (index, value)
     let mut pairs = Vec::with_capacity(size);

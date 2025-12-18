@@ -18,8 +18,7 @@ use qdrant_client::qdrant::{
     ReplicaState, SetPayloadPointsBuilder, SparseVectorConfig, UpsertPointsBuilder, Vector,
     VectorInput, VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
-use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 use reqwest::Client;
 use serde_json::Value;
 use serde_json::json;
@@ -145,13 +144,13 @@ pub async fn query_batch_points(
     payload_count: usize,
     with_vector: bool,
     limit: u64,
+    rng: &mut impl Rng,
 ) -> Result<QueryBatchResponse, CrasherError> {
-    let request_filter = random_filter(Some(payload_count));
+    let request_filter = random_filter(rng, Some(payload_count));
     let mut requests = vec![];
-
     // sparse search requests
     for sparse_name in test_named_vectors.sparse_vector_names() {
-        let sparse_vector = random_sparse_vector(vec_dim, 0.1);
+        let sparse_vector = random_sparse_vector(rng, vec_dim, 0.1);
         // split values & indices
         let sparse_indices: Vec<_> = sparse_vector.iter().map(|(idx, _)| *idx).collect();
         let sparse_values: Vec<_> = sparse_vector.iter().map(|(_, val)| *val).collect();
@@ -181,7 +180,8 @@ pub async fn query_batch_points(
     if !only_sparse {
         // dense
         for dense_name in test_named_vectors.dense_vector_names() {
-            let query_vector = VectorInput::new_dense(random_dense_vector(&dense_name, vec_dim));
+            let query_vector =
+                VectorInput::new_dense(random_dense_vector(rng, &dense_name, vec_dim));
             let query_nearest = Query::new_nearest(query_vector);
             let request = QueryPoints {
                 collection_name: collection_name.to_string(),
@@ -204,9 +204,9 @@ pub async fn query_batch_points(
         }
         // multi dense
         for multi_dense_name in test_named_vectors.multi_vector_names() {
-            let vec_count = SmallRng::from_os_rng().random_range(1..5);
+            let vec_count = rng.random_range(1..5);
             let multi_vector: Vec<_> = (0..vec_count)
-                .map(|_| random_dense_vector(&multi_dense_name, vec_dim))
+                .map(|_| random_dense_vector(rng, &multi_dense_name, vec_dim))
                 .collect();
             let query_vector = VectorInput::new_multi(multi_vector);
             let query_nearest = Query::new_nearest(query_vector);
@@ -311,6 +311,7 @@ pub async fn insert_points_batch(
     test_named_vectors: &TestNamedVectors,
     write_ordering: Option<WriteOrdering>,
     stopped: Arc<AtomicBool>,
+    rng: &mut impl Rng,
 ) -> Result<(), CrasherError> {
     let max_batch_size = 10;
     // handle less than batch & spill over
@@ -347,14 +348,14 @@ pub async fn insert_points_batch(
                 for name in test_named_vectors.dense_vector_names() {
                     vectors_map.insert(
                         name.clone(),
-                        Vector::new_dense(random_dense_vector(&name, vec_dim)),
+                        Vector::new_dense(random_dense_vector(rng, &name, vec_dim)),
                     );
                 }
                 // multi dense
                 for name in test_named_vectors.multi_vector_names() {
-                    let vec_count = SmallRng::from_os_rng().random_range(1..5);
+                    let vec_count = rng.random_range(1..5);
                     let multi_vector: Vec<Vec<_>> = (0..vec_count)
-                        .map(|_| random_dense_vector(&name, vec_dim))
+                        .map(|_| random_dense_vector(rng, &name, vec_dim))
                         .collect();
                     vectors_map.insert(name.clone(), Vector::new_multi(multi_vector));
                 }
@@ -362,12 +363,12 @@ pub async fn insert_points_batch(
 
             // always add sparse vectors
             for name in test_named_vectors.sparse_vector_names() {
-                vectors_map.insert(name.clone(), random_sparse_vector(vec_dim, 0.1).into());
+                vectors_map.insert(name.clone(), random_sparse_vector(rng, vec_dim, 0.1).into());
             }
 
             let vectors: Vectors = vectors_map.into();
 
-            let mut payload = random_payload(Some(payload_count));
+            let mut payload = random_payload(rng, Some(payload_count));
 
             if mandatory_payload {
                 payload.insert(
@@ -420,8 +421,9 @@ pub async fn set_payload(
     point_id: u64,
     payload_count: usize,
     write_ordering: Option<WriteOrdering>,
+    rng: &mut impl Rng,
 ) -> Result<(), CrasherError> {
-    let payload = random_payload(Some(payload_count));
+    let payload = random_payload(rng, Some(payload_count));
 
     let points_id_selector = vec![PointId {
         point_id_options: Some(PointIdOptions::Num(point_id)),

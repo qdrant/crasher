@@ -8,6 +8,8 @@ use qdrant_client::qdrant::{
     KeywordIndexParamsBuilder, QueryBatchResponse, ScrollPointsBuilder, TextIndexParamsBuilder,
     TokenizerType, UuidIndexParamsBuilder, VectorOutput, WriteOrdering, vector_output,
 };
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -115,6 +117,7 @@ impl Workload {
     }
 
     pub async fn run(&self, client: &Qdrant, args: Arc<Args>) -> Result<(), CrasherError> {
+        let mut rng = SmallRng::from_os_rng();
         log::info!("Starting workload...");
         // create and populate collection if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
@@ -297,6 +300,7 @@ impl Workload {
             &self.test_named_vectors,
             None,
             self.stopped.clone(),
+            &mut rng,
         )
         .await?;
 
@@ -319,6 +323,7 @@ impl Workload {
                 point_id as u64,
                 self.payload_count,
                 self.write_ordering,
+                &mut rng,
             )
             .await?;
         }
@@ -340,6 +345,7 @@ impl Workload {
                 self.payload_count,
                 true,
                 10,
+                &mut rng,
             )
             .await?;
             check_search_result(results)?;
