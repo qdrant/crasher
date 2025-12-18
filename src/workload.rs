@@ -474,14 +474,14 @@ impl Workload {
             errors_found.push(format!(
                 "detected {} malformed points:\n{:?}",
                 malformed_points_errors.len(),
-                malformed_points_errors
+                malformed_points_errors.join("/n")
             ));
         }
 
         if errors_found.is_empty() {
             Ok(())
         } else {
-            let errors_rendered = errors_found.join("/n  - ");
+            let errors_rendered = errors_found.join("/n");
             Err(Invariant(errors_rendered.to_string()))
         }
     }
@@ -499,21 +499,21 @@ impl Workload {
 
         // check all points and vector present in storage
         match self.check_points_consistency(client, current_count).await {
-            Err(Invariant(e)) => errors.push(format!("Inconsistent storage: {e}")),
+            Err(Invariant(e)) => errors.push(format!("*Inconsistent storage*\n{e}")),
             Err(e) => return Err(e),
             Ok(()) => (),
         }
 
         // check mandatory timestamp payload key via null index
         match self.check_filter_null_index(client, current_count).await {
-            Err(Invariant(e)) => errors.push(format!("Inconsistent Null Index: {e}")),
+            Err(Invariant(e)) => errors.push(format!("*Inconsistent Null Index*\n{e}")),
             Err(e) => return Err(e),
             Ok(()) => (),
         }
 
         // check mandatory bool payload key via match query
         match self.check_filter_bool_index(client, current_count).await {
-            Err(Invariant(e)) => errors.push(format!("Inconsistent Bool Index: {e}")),
+            Err(Invariant(e)) => errors.push(format!("*Inconsistent Bool Index*\n{e}")),
             Err(e) => return Err(e),
             Ok(()) => (),
         }
@@ -552,7 +552,7 @@ impl Workload {
             Ok(())
         } else {
             Err(Invariant(format!(
-                "detected {} points missing the '{}' payload key when matching for null values\n{:?}",
+                "detected {} points missing the '{}' payload key when matching for null values:\n{:?}",
                 points.len(),
                 MANDATORY_PAYLOAD_TIMESTAMP_KEY,
                 points,
@@ -596,7 +596,7 @@ impl Workload {
             Ok(())
         } else {
             Err(Invariant(format!(
-                "detected {} points missing the '{}: true' when matching payload\n{:?}",
+                "detected {} points missing the '{}: true' when matching payload:\n{:?}",
                 missing_points.len(),
                 MANDATORY_PAYLOAD_BOOL_KEY,
                 missing_points,
