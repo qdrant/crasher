@@ -149,7 +149,7 @@ pub async fn query_batch_points(
     let request_filter = random_filter(rng, Some(payload_count));
     let mut requests = vec![];
     // sparse search requests
-    for sparse_name in test_named_vectors.sparse_vector_names() {
+    for sparse_name in test_named_vectors.sparse_names() {
         let sparse_vector = random_sparse_vector(rng, vec_dim, 0.1);
         // split values & indices
         let sparse_indices: Vec<_> = sparse_vector.iter().map(|(idx, _)| *idx).collect();
@@ -179,7 +179,7 @@ pub async fn query_batch_points(
     // dense search requests
     if !only_sparse {
         // dense
-        for dense_name in test_named_vectors.dense_vector_names() {
+        for dense_name in test_named_vectors.dense_names() {
             let query_vector =
                 VectorInput::new_dense(random_dense_vector(rng, &dense_name, vec_dim));
             let query_nearest = Query::new_nearest(query_vector);
@@ -203,7 +203,7 @@ pub async fn query_batch_points(
             requests.push(request);
         }
         // multi dense
-        for multi_dense_name in test_named_vectors.multi_vector_names() {
+        for multi_dense_name in test_named_vectors.multi_names() {
             let vec_count = rng.random_range(1..5);
             let multi_vector: Vec<_> = (0..vec_count)
                 .map(|_| random_dense_vector(rng, &multi_dense_name, vec_dim))
@@ -245,7 +245,7 @@ pub async fn create_collection(
     test_named_vectors: &TestNamedVectors,
     args: Arc<Args>,
 ) -> Result<(), CrasherError> {
-    let sparse_vector_params = test_named_vectors.sparse_vectors();
+    let sparse_vector_params = test_named_vectors.sparse_params();
     let sparse_vectors_config = SparseVectorConfig {
         map: sparse_vector_params,
     };
@@ -254,11 +254,11 @@ pub async fn create_collection(
         let mut all_dense_params = HashMap::new();
 
         // dense vectors
-        let dense_vector_params = test_named_vectors.dense_vectors();
+        let dense_vector_params = test_named_vectors.dense_params();
         all_dense_params.extend(dense_vector_params);
 
         // multi dense vectors
-        let multi_dense_vector_params = test_named_vectors.multi_dense_vectors();
+        let multi_dense_vector_params = test_named_vectors.multi_dense_params();
         all_dense_params.extend(multi_dense_vector_params);
 
         Some(VectorsConfig {
@@ -320,7 +320,7 @@ pub async fn insert_points_batch(
     } else {
         let remainder = points_count % max_batch_size;
         let div = points_count / max_batch_size;
-        let num_batches = div + if remainder > 0 { 1 } else { 0 };
+        let num_batches = div + u32::from(remainder > 0);
         let last_batch_size = if remainder > 0 {
             remainder
         } else {
@@ -345,14 +345,14 @@ pub async fn insert_points_batch(
 
             if !only_sparse_vectors {
                 // dense
-                for name in test_named_vectors.dense_vector_names() {
+                for name in test_named_vectors.dense_names() {
                     vectors_map.insert(
                         name.clone(),
                         Vector::new_dense(random_dense_vector(rng, &name, vec_dim)),
                     );
                 }
                 // multi dense
-                for name in test_named_vectors.multi_vector_names() {
+                for name in test_named_vectors.multi_names() {
                     let vec_count = rng.random_range(1..5);
                     let multi_vector: Vec<Vec<_>> = (0..vec_count)
                         .map(|_| random_dense_vector(rng, &name, vec_dim))
@@ -362,7 +362,7 @@ pub async fn insert_points_batch(
             }
 
             // always add sparse vectors
-            for name in test_named_vectors.sparse_vector_names() {
+            for name in test_named_vectors.sparse_names() {
                 vectors_map.insert(name.clone(), random_sparse_vector(rng, vec_dim, 0.1).into());
             }
 
@@ -451,10 +451,7 @@ pub async fn retrieve_points(
         .get_points(
             GetPointsBuilder::new(
                 collection_name,
-                ids.iter()
-                    .map(|id| (*id as u64).into())
-                    .collect::<Vec<_>>()
-                    .as_slice(),
+                ids.iter().map(|id| (*id as u64).into()).collect::<Vec<_>>(),
             )
             .with_vectors(true)
             .with_payload(true),

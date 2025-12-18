@@ -10,7 +10,7 @@ use qdrant_client::qdrant::{
 };
 use rand::Rng;
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 // TODO do not generate vector configuration manually but create all possibility exhaustively
 
 /// Dense vectors base names
@@ -53,17 +53,17 @@ pub const UUID_PAYLOAD_KEY: &str = "crasher-payload-uuid";
 
 #[derive(Debug)]
 pub struct TestNamedVectors {
-    dense_vectors: HashMap<String, VectorParams>,
-    sparse_vectors: HashMap<String, SparseVectorParams>,
-    multi_vectors: HashMap<String, VectorParams>,
+    dense: BTreeMap<String, VectorParams>,
+    sparse: BTreeMap<String, SparseVectorParams>,
+    multi: BTreeMap<String, VectorParams>,
 }
 
 // TODO unit test names
 impl TestNamedVectors {
     pub fn new(duplication_factor: u32, vec_dim: u32) -> Self {
-        let mut sparse_vectors = HashMap::new();
-        let mut dense_vectors = HashMap::new();
-        let mut multi_vectors = HashMap::new();
+        let mut sparse = BTreeMap::new();
+        let mut dense = BTreeMap::new();
+        let mut multi = BTreeMap::new();
 
         let hnsw_config = Some(HnswConfigDiff {
             m: Some(32),
@@ -78,7 +78,7 @@ impl TestNamedVectors {
         // dense vectors on disk
         for i in 1..=duplication_factor {
             let name = format!("{DENSE_VECTOR_NAME_ON_DISK}-{i}");
-            dense_vectors.insert(
+            dense.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -95,7 +95,7 @@ impl TestNamedVectors {
         // dense vector rocksdb
         for i in 1..=duplication_factor {
             let name = format!("{DENSE_VECTOR_NAME_ROCKSDB}-{i}");
-            dense_vectors.insert(
+            dense.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -112,7 +112,7 @@ impl TestNamedVectors {
         // dense vectors uint8
         for i in 1..=duplication_factor {
             let name = format!("{DENSE_VECTOR_NAME_UINT8}-{i}");
-            dense_vectors.insert(
+            dense.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -129,7 +129,7 @@ impl TestNamedVectors {
         // dense vectors float16
         for i in 1..=duplication_factor {
             let name = format!("{DENSE_VECTOR_NAME_FLOAT16}-{i}");
-            dense_vectors.insert(
+            dense.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -146,7 +146,7 @@ impl TestNamedVectors {
         // dense vectors SQ
         for i in 1..=duplication_factor {
             let name = format!("{DENSE_VECTOR_NAME_SQ}-{i}");
-            dense_vectors.insert(
+            dense.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -169,7 +169,7 @@ impl TestNamedVectors {
         // dense vectors PQ
         for i in 1..=duplication_factor {
             let name = format!("{DENSE_VECTOR_NAME_PQ}-{i}");
-            dense_vectors.insert(
+            dense.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -195,7 +195,7 @@ impl TestNamedVectors {
             let bq_builder =
                 BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::TwoBits);
 
-            dense_vectors.insert(
+            dense.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -214,7 +214,7 @@ impl TestNamedVectors {
         // sparse vector index on disk
         for i in 1..=duplication_factor {
             let name = format!("{SPARSE_VECTOR_NAME_INDEX_DISK}-{i}");
-            sparse_vectors.insert(
+            sparse.insert(
                 name.clone(),
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
@@ -230,7 +230,7 @@ impl TestNamedVectors {
         // sparse vector index in memory
         for i in 1..=duplication_factor {
             let name = format!("{SPARSE_VECTOR_NAME_INDEX_MEMORY}-{i}");
-            sparse_vectors.insert(
+            sparse.insert(
                 name.clone(),
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
@@ -246,7 +246,7 @@ impl TestNamedVectors {
         // sparse vector uint8
         for i in 1..=duplication_factor {
             let name = format!("{SPARSE_VECTOR_NAME_UINT8}-{i}");
-            sparse_vectors.insert(
+            sparse.insert(
                 name.clone(),
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
@@ -262,7 +262,7 @@ impl TestNamedVectors {
         // sparse vector float16
         for i in 1..=duplication_factor {
             let name = format!("{SPARSE_VECTOR_NAME_FLOAT16}-{i}");
-            sparse_vectors.insert(
+            sparse.insert(
                 name.clone(),
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
@@ -279,7 +279,7 @@ impl TestNamedVectors {
         // multi vector on disk
         for i in 1..=duplication_factor {
             let name = format!("{MULTI_VECTOR_NAME_ON_DISK}-{i}");
-            multi_vectors.insert(
+            multi.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -296,7 +296,7 @@ impl TestNamedVectors {
         // multi vector rocksdb
         for i in 1..=duplication_factor {
             let name = format!("{MULTI_VECTOR_NAME_ROCKSDB}-{i}");
-            multi_vectors.insert(
+            multi.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -313,7 +313,7 @@ impl TestNamedVectors {
         // multi vector uint8
         for i in 1..=duplication_factor {
             let name = format!("{MULTI_VECTOR_NAME_UINT8}-{i}");
-            multi_vectors.insert(
+            multi.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -330,7 +330,7 @@ impl TestNamedVectors {
         // multi vector float16
         for i in 1..=duplication_factor {
             let name = format!("{MULTI_VECTOR_NAME_FLOAT16}-{i}");
-            multi_vectors.insert(
+            multi.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -347,7 +347,7 @@ impl TestNamedVectors {
         // multi vectors SQ
         for i in 1..=duplication_factor {
             let name = format!("{MULTI_VECTOR_NAME_SQ}-{i}");
-            multi_vectors.insert(
+            multi.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -370,7 +370,7 @@ impl TestNamedVectors {
         // multi vectors PQ
         for i in 1..=duplication_factor {
             let name = format!("{MULTI_VECTOR_NAME_PQ}-{i}");
-            multi_vectors.insert(
+            multi.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -394,7 +394,7 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_BQ}-{i}");
             let bq_builder =
                 BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::TwoBits);
-            multi_vectors.insert(
+            multi.insert(
                 name,
                 VectorParams {
                     size: vec_dim as u64,
@@ -411,34 +411,34 @@ impl TestNamedVectors {
         }
 
         Self {
-            dense_vectors,
-            sparse_vectors,
-            multi_vectors,
+            dense,
+            sparse,
+            multi,
         }
     }
 
-    pub fn sparse_vectors(&self) -> HashMap<String, SparseVectorParams> {
-        self.sparse_vectors.clone()
+    pub fn sparse_params(&self) -> HashMap<String, SparseVectorParams> {
+        self.sparse.clone().into_iter().collect()
     }
 
-    pub fn dense_vectors(&self) -> HashMap<String, VectorParams> {
-        self.dense_vectors.clone()
+    pub fn dense_params(&self) -> HashMap<String, VectorParams> {
+        self.dense.clone().into_iter().collect()
     }
 
-    pub fn multi_dense_vectors(&self) -> HashMap<String, VectorParams> {
-        self.multi_vectors.clone()
+    pub fn multi_dense_params(&self) -> HashMap<String, VectorParams> {
+        self.multi.clone().into_iter().collect()
     }
 
-    pub fn sparse_vector_names(&self) -> Vec<String> {
-        self.sparse_vectors.keys().cloned().collect()
+    pub fn sparse_names(&self) -> Vec<String> {
+        self.sparse.keys().cloned().collect()
     }
 
-    pub fn dense_vector_names(&self) -> Vec<String> {
-        self.dense_vectors.keys().cloned().collect()
+    pub fn dense_names(&self) -> Vec<String> {
+        self.dense.keys().cloned().collect()
     }
 
-    pub fn multi_vector_names(&self) -> Vec<String> {
-        self.multi_vectors.keys().cloned().collect()
+    pub fn multi_names(&self) -> Vec<String> {
+        self.multi.keys().cloned().collect()
     }
 }
 
@@ -470,33 +470,37 @@ pub fn random_payload(rng: &mut impl Rng, keywords: Option<u32>) -> Payload {
 }
 
 pub fn random_filter(rng: &mut impl Rng, keywords: Option<u32>) -> Option<Filter> {
-    let mut filter = Filter {
-        should: vec![],
-        must: vec![],
-        must_not: vec![],
-        min_should: None,
-    };
-    let mut have_any = false;
     if let Some(keyword_variants) = keywords {
-        have_any = true;
+        let mut filter = Filter {
+            should: vec![],
+            must: vec![],
+            must_not: vec![],
+            min_should: None,
+        };
 
         filter.must.push(Condition::matches(
             KEYWORD_PAYLOAD_KEY,
             MatchValue::Keyword(random_keyword(rng, keyword_variants)),
         ));
+        Some(filter)
+    } else {
+        None
     }
-    if have_any { Some(filter) } else { None }
 }
 
 pub fn random_dense_vector(rng: &mut impl Rng, name: &str, dim: u32) -> Vec<f32> {
-    let range = if name.contains("uint8") {
-        // uint8 vectors get mapped to integers. If we use regular range it is very possible we get a
-        // zeroed vector, which we are asserting should not happen
-        1.0..255.0
+    let mut res = Vec::with_capacity(dim as usize);
+    // uint8 vectors get mapped to integers. If we use regular range it is very possible we get a
+    // zeroed vector, which we are asserting should not happen
+    if name.contains("uint8") {
+        for _ in 0..dim {
+            res.push(rng.random_range(1.0..255.0));
+        }
     } else {
-        -10.0..10.0
-    };
-    let res: Vec<f32> = (0..dim).map(|_| rng.random_range(range.clone())).collect();
+        for _ in 0..dim {
+            res.push(rng.random_range(-10.0..10.0));
+        }
+    }
     assert!(
         !res.iter().all(|&x| x == 0.0),
         "Zero vector generated {res:?}"

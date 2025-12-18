@@ -1,3 +1,4 @@
+use ahash::AHashSet;
 use anyhow::Result;
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::point_id::PointIdOptions;
@@ -9,7 +10,6 @@ use qdrant_client::qdrant::{
     TokenizerType, UuidIndexParamsBuilder, VectorOutput, WriteOrdering, vector_output,
 };
 use rand::Rng;
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -90,7 +90,7 @@ impl Workload {
                 }
                 Err(Invariant(msg)) => {
                     log::error!(
-                        "Workload run failed due to an invariant violation!(rng_seed:{}) \n{msg}",
+                        "Workload run failed due to an invariant violation! (rng_seed:{})\n{msg}",
                         self.rng_seed
                     );
                     // Uncomment to display telemetry for debugging
@@ -114,7 +114,7 @@ impl Workload {
                             "Workload run failed due to client error - resuming soon\n{error:?}"
                         );
                         // no need to hammer the server while it restarts
-                        sleep(std::time::Duration::from_secs(3)).await;
+                        sleep(Duration::from_secs(3)).await;
                     }
                 }
             }
@@ -295,7 +295,7 @@ impl Workload {
         }
 
         log::info!("Run: trigger collection snapshot in the background");
-        let snapshotting_handle = self.trigger_continous_snapshotting(client);
+        let snapshotting_handle = self.trigger_continuous_snapshotting(client);
 
         log::info!("Run: insert points");
         insert_points_batch(
@@ -357,13 +357,13 @@ impl Workload {
                 rng,
             )
             .await?;
-            check_search_result(results)?;
+            check_search_result(&results)?;
         }
 
-        // Stop on-going snapshotting task
+        // Stop ongoing snapshotting task
         snapshotting_handle.abort();
         match snapshotting_handle.await {
-            Ok(Ok(_)) => (),
+            Ok(Ok(())) => (),
             Err(_) => (),                                      // ignore JoinError
             Ok(Err(snapshot_err)) => return Err(snapshot_err), // capture failed snapshot
         }
@@ -399,19 +399,19 @@ impl Workload {
                         PointIdOptions::Num(id) => id as usize,
                         PointIdOptions::Uuid(_) => panic!("UUID in the response"),
                     })
-                    .collect::<HashSet<_>>();
+                    .collect::<AHashSet<_>>();
 
                 let missing_ids = ids
                     .iter()
                     .filter(|&id| !response_ids.contains(id))
-                    .cloned()
+                    .copied()
                     .collect::<Vec<_>>();
                 missing_points_errors.extend_from_slice(&missing_ids);
             }
-            // check points are welformed
+            // check points are well-formed
             for point in &response.result {
                 let point_id = point.id.as_ref().expect("Point id should be present");
-                // wellformed vectors
+                // well-formed vectors
                 if let Some(vectors) = &point.vectors {
                     if let Some(vector) = &vectors.vectors_options {
                         match vector {
@@ -553,7 +553,7 @@ impl Workload {
                     .limit(current_count as u32),
             )
             .await?;
-        let points: HashSet<_> = resp
+        let points: AHashSet<_> = resp
             .result
             .into_iter()
             .filter_map(|point| {
@@ -583,7 +583,7 @@ impl Workload {
         }
     }
 
-    fn trigger_continous_snapshotting(
+    fn trigger_continuous_snapshotting(
         &self,
         client: &Qdrant,
     ) -> JoinHandle<Result<(), CrasherError>> {
@@ -593,7 +593,7 @@ impl Workload {
         tokio::spawn(async move {
             while !stopped.load(Ordering::Relaxed) {
                 match churn_collection_snapshot(&client_snapshot, &collection_name).await {
-                    Ok(_) => tokio::time::sleep(Duration::from_millis(500)).await,
+                    Ok(()) => tokio::time::sleep(Duration::from_millis(500)).await,
                     Err(err) => {
                         log::warn!("Snapshotting failed {err}");
                         // stop at first snapshot error silently
@@ -639,7 +639,7 @@ fn check_zeroed_vector(vector: &VectorOutput) -> bool {
         .unwrap_or_else(|| vector.data.iter().all(|v| *v == 0.0))
 }
 
-fn check_search_result(results: QueryBatchResponse) -> Result<(), CrasherError> {
+fn check_search_result(results: &QueryBatchResponse) -> Result<(), CrasherError> {
     // assert no vector is only containing zeros
     for point in results.result.iter().flat_map(|result| &result.result) {
         if let Some(vectors) = point

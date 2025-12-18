@@ -38,7 +38,7 @@ async fn main() {
 
     let client_config = get_config(args.uris.first().unwrap(), args.grpc_timeout_ms);
     let client = Qdrant::new(client_config).unwrap();
-    let client = Arc::new(client).clone();
+    let client = Arc::new(client);
     let args = Arc::new(args);
     let crash_probability = args.crash_probability;
     let sleep_duration_between_crash_sec = args.sleep_duration_between_crash_sec;
@@ -52,9 +52,7 @@ async fn main() {
                 Some(child_process_id) => {
                     log::info!("Child qdrant process id {child_process_id:?}");
                     log::info!("Waiting for qdrant to be ready...");
-                    if let Err(err) =
-                        wait_server_ready(&client.clone(), stopped.clone(), false).await
-                    {
+                    if let Err(err) = wait_server_ready(&client, stopped.clone(), false).await {
                         log::error!("Failed to wait for qdrant to be ready: {err:?}");
                         exit(1)
                     }
@@ -65,7 +63,7 @@ async fn main() {
 
                     let collection_name = COLLECTION_NAME;
                     let crash_lock = Arc::new(tokio::sync::Mutex::new(()));
-                    let (rng_seed, mut workload_rng, mut choas_rng) = create_rngs(args.rng_seed);
+                    let (rng_seed, mut workload_rng, mut chaos_rng) = create_rngs(args.rng_seed);
 
                     // workload task
                     let client_worker = client.clone();
@@ -80,9 +78,7 @@ async fn main() {
                     );
 
                     let workload_task = tokio::spawn(async move {
-                        workload
-                            .work(&client_worker, args.clone(), &mut workload_rng)
-                            .await;
+                        workload.work(&client_worker, args, &mut workload_rng).await;
                     });
 
                     // get started a bit before chaos
@@ -92,12 +88,12 @@ async fn main() {
                     let process_manager_task = tokio::spawn(async move {
                         process_manager
                             .chaos(
-                                stopped.clone(),
-                                crash_lock.clone(),
-                                &client.clone(),
+                                stopped,
+                                crash_lock,
+                                &client,
                                 crash_probability as f64,
                                 sleep_duration_between_crash_sec,
-                                &mut choas_rng,
+                                &mut chaos_rng,
                             )
                             .await;
                     });

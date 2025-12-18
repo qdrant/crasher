@@ -15,31 +15,31 @@ pub enum CrasherError {
 
 impl From<anyhow::Error> for CrasherError {
     fn from(e: anyhow::Error) -> Self {
-        CrasherError::Client(e)
+        Self::Client(e)
     }
 }
 
 impl From<reqwest::Error> for CrasherError {
     fn from(e: reqwest::Error) -> Self {
-        CrasherError::Client(e.into())
+        Self::Client(e.into())
     }
 }
 
 impl From<serde_json::Error> for CrasherError {
     fn from(e: serde_json::Error) -> Self {
-        CrasherError::Client(e.into())
+        Self::Client(e.into())
     }
 }
 
-impl From<qdrant_client::QdrantError> for CrasherError {
-    fn from(err: qdrant_client::QdrantError) -> Self {
+impl From<QdrantError> for CrasherError {
+    fn from(err: QdrantError) -> Self {
         // Network error and timeout are detected as transient errors
         match &err {
             QdrantError::Io(_) => anyhow::anyhow!(err).into(),
             QdrantError::ResponseError { status } => {
                 if status.code() == tonic::Code::NotFound || status.code() == tonic::Code::Cancelled
                 {
-                    CrasherError::Invariant(format!("{err}"))
+                    Self::Invariant(format!("{err}"))
                 } else {
                     anyhow::anyhow!(err).into()
                 }
@@ -48,12 +48,12 @@ impl From<qdrant_client::QdrantError> for CrasherError {
                 status: _,
                 retry_after_seconds: _,
             } => anyhow::anyhow!(err).into(),
-            QdrantError::PayloadDeserialization(_) => CrasherError::Invariant(format!("{err}")),
-            QdrantError::ConversionError(_) => CrasherError::Invariant(format!("{err}")),
-            QdrantError::InvalidUri(_) => CrasherError::Invariant(format!("{err}")),
-            QdrantError::NoSnapshotFound(_) => CrasherError::Invariant(format!("{err}")),
-            QdrantError::Reqwest(_) => CrasherError::Invariant(format!("{err}")),
-            QdrantError::JsonToPayload(_) => CrasherError::Invariant(format!("{err}")),
+            QdrantError::PayloadDeserialization(_) => Self::Invariant(format!("{err}")),
+            QdrantError::ConversionError(_) => Self::Invariant(format!("{err}")),
+            QdrantError::InvalidUri(_) => Self::Invariant(format!("{err}")),
+            QdrantError::NoSnapshotFound(_) => Self::Invariant(format!("{err}")),
+            QdrantError::Reqwest(_) => Self::Invariant(format!("{err}")),
+            QdrantError::JsonToPayload(_) => Self::Invariant(format!("{err}")),
         }
     }
 }
