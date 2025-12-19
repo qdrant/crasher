@@ -1,14 +1,9 @@
-use ahash::AHashSet;
 use anyhow::Result;
-use futures::stream::{self, StreamExt, TryStreamExt};
 use qdrant_client::Qdrant;
-use qdrant_client::qdrant::point_id::PointIdOptions;
-use qdrant_client::qdrant::vectors_output::VectorsOptions;
 use qdrant_client::qdrant::{
-    BoolIndexParamsBuilder, Condition, DatetimeIndexParamsBuilder, FieldType, Filter,
-    FloatIndexParamsBuilder, GeoIndexParamsBuilder, IntegerIndexParamsBuilder,
-    KeywordIndexParamsBuilder, QueryBatchResponse, ScrollPointsBuilder, TextIndexParamsBuilder,
-    TokenizerType, UuidIndexParamsBuilder, VectorOutput, WriteOrdering, vector_output,
+    BoolIndexParamsBuilder, DatetimeIndexParamsBuilder, FieldType, FloatIndexParamsBuilder,
+    GeoIndexParamsBuilder, IntegerIndexParamsBuilder, KeywordIndexParamsBuilder,
+    TextIndexParamsBuilder, TokenizerType, UuidIndexParamsBuilder, WriteOrdering,
 };
 use rand::Rng;
 use std::sync::Arc;
@@ -18,11 +13,13 @@ use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
 use crate::args::Args;
+use crate::checker::{
+    check_filter_bool_index, check_filter_null_index, check_points_consistency, check_search_result,
+};
 use crate::client::{
     create_collection, create_collection_snapshot, create_field_index, delete_collection_snapshot,
     delete_points, get_collection_info, get_exact_points_count, get_telemetry, insert_points_batch,
-    list_collection_snapshots, query_batch_points, restore_collection_snapshot, retrieve_points,
-    set_payload,
+    list_collection_snapshots, query_batch_points, restore_collection_snapshot, set_payload,
 };
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
@@ -377,137 +374,12 @@ impl Workload {
         snapshotting_handle.abort();
         match snapshotting_handle.await {
             Ok(Ok(())) => (),
-            Err(_join_error) => (),                            // ignore JoinError
+            Err(_join_error) => (), // ignore JoinError
             Ok(Err(snapshot_err)) => return Err(snapshot_err), // capture failed snapshot
         }
 
         log::info!("Workload finished in {:?}", start.elapsed());
         Ok(())
-    }
-
-    /// Vector data consistency checker for id range
-    #[allow(deprecated)]
-    async fn check_points_consistency(
-        &self,
-        client: &Qdrant,
-        current_count: usize,
-    ) -> Result<(), CrasherError> {
-        // fetch all existing points (rely on numeric ids!)
-        let all_ids: Vec<_> = (1..current_count).collect();
-
-        // track all errors
-        let mut missing_points_errors: Vec<usize> = Vec::new();
-        let mut malformed_points_errors: Vec<String> = Vec::new();
-
-        // Stream process checks by batches to not overload the server
-        let min_batch_size = 1_000;
-        let ids_batch: Vec<Arc<[usize]>> = all_ids
-            .chunks(current_count.min(min_batch_size))
-            .map(Arc::from)
-            .collect();
-        let mut retrieve_points_f = stream::iter(ids_batch)
-            .map(|ids| async {
-                let resp = retrieve_points(client, &self.collection_name, &ids).await?;
-                Ok::<_, CrasherError>((ids, resp))
-            })
-            .buffered(1);
-
-        while let Some((expected_ids, response)) = retrieve_points_f.try_next().await? {
-            // check if missing points
-            if response.result.len() != expected_ids.len() {
-                let response_ids = response
-                    .result
-                    .iter()
-                    .map(|point| point.id.clone().unwrap().point_id_options.unwrap())
-                    .map(|id| match id {
-                        PointIdOptions::Num(id) => id as usize,
-                        PointIdOptions::Uuid(_) => panic!("UUID in the response"),
-                    })
-                    .collect::<AHashSet<_>>();
-
-                let missing_ids = expected_ids
-                    .iter()
-                    .filter(|&id| !response_ids.contains(id))
-                    .copied()
-                    .collect::<Vec<_>>();
-                missing_points_errors.extend_from_slice(&missing_ids);
-            }
-            // check points are well-formed
-            for point in &response.result {
-                let point_id = point.id.as_ref().expect("Point id should be present");
-                // well-formed vectors
-                if let Some(vectors) = &point.vectors {
-                    if let Some(vector) = &vectors.vectors_options {
-                        match vector {
-                            VectorsOptions::Vector(anonymous) => {
-                                malformed_points_errors.push(format!(
-                                    "Vector {point_id:?} should be named: {anonymous:?}"
-                                ));
-                            }
-                            VectorsOptions::Vectors(named_vectors) => {
-                                if named_vectors.vectors.is_empty() {
-                                    malformed_points_errors.push(format!(
-                                        "Named vector {point_id:?} should not be empty"
-                                    ));
-                                }
-                                for (name, vector) in &named_vectors.vectors {
-                                    if vector.data.is_empty() {
-                                        malformed_points_errors.push(format!(
-                                            "Vector {name} with id {point_id:?} should not be empty"
-                                        ));
-                                    }
-                                    if check_zeroed_vector(vector) {
-                                        malformed_points_errors.push(format!(
-                                            "Vector {name} with id {point_id:?} is zeroed"
-                                        ));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    malformed_points_errors.push(format!(
-                        "Vector {point_id:?} should be present in the response"
-                    ));
-                }
-                // check mandatory payload keys
-                if !point.payload.contains_key(MANDATORY_PAYLOAD_BOOL_KEY) {
-                    malformed_points_errors.push(format!(
-                        "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_BOOL_KEY} in storage"
-                    ));
-                }
-                if !point.payload.contains_key(MANDATORY_PAYLOAD_TIMESTAMP_KEY) {
-                    malformed_points_errors.push(format!(
-                        "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_TIMESTAMP_KEY} in storage"
-                    ));
-                }
-            }
-        }
-
-        // merge all violations found
-        let mut errors_found = Vec::new();
-        if !missing_points_errors.is_empty() {
-            errors_found.push(format!(
-                "detected {} missing points:\n{:?}",
-                missing_points_errors.len(),
-                missing_points_errors
-            ));
-        }
-
-        if !malformed_points_errors.is_empty() {
-            errors_found.push(format!(
-                "detected {} malformed points:\n{:?}",
-                malformed_points_errors.len(),
-                malformed_points_errors.join("/n")
-            ));
-        }
-
-        if errors_found.is_empty() {
-            Ok(())
-        } else {
-            let errors_rendered = errors_found.join("/n");
-            Err(Invariant(errors_rendered.to_string()))
-        }
     }
 
     /// Validate data consistency from the client side
@@ -522,110 +394,33 @@ impl Workload {
         let mut errors = Vec::new();
 
         // check all points and vector present in storage
-        match self.check_points_consistency(client, current_count).await {
+        match check_points_consistency(&self.collection_name, client, current_count).await {
             Err(Invariant(e)) => errors.push(format!("*Inconsistent storage*\n{e}")),
             Err(e) => return Err(e),
             Ok(()) => (),
         }
 
         // check mandatory timestamp payload key via null index
-        match self.check_filter_null_index(client, current_count).await {
+        match check_filter_null_index(&self.collection_name, client, current_count).await {
             Err(Invariant(e)) => errors.push(format!("*Inconsistent Null Index*\n{e}")),
             Err(e) => return Err(e),
             Ok(()) => (),
         }
 
         // check mandatory bool payload key via match query
-        match self.check_filter_bool_index(client, current_count).await {
+        match check_filter_bool_index(&self.collection_name, client, current_count).await {
             Err(Invariant(e)) => errors.push(format!("*Inconsistent Bool Index*\n{e}")),
             Err(e) => return Err(e),
             Ok(()) => (),
         }
 
         if errors.is_empty() {
-            Ok(())
-        } else {
-            let full_report = errors.join("\n---\n");
-            Err(Invariant(format!(
-                "Data inconsistencies found out of {current_count} points:\n{full_report}"
-            )))
+            return Ok(());
         }
-    }
-
-    async fn check_filter_null_index(
-        &self,
-        client: &Qdrant,
-        current_count: usize,
-    ) -> Result<(), CrasherError> {
-        let resp = client
-            .scroll(
-                ScrollPointsBuilder::new(&self.collection_name)
-                    .filter(Filter::must([Condition::is_empty(
-                        MANDATORY_PAYLOAD_TIMESTAMP_KEY,
-                    )]))
-                    .limit(current_count as u32),
-            )
-            .await?;
-        let points: Vec<_> = resp
-            .result
-            .into_iter()
-            .map(|point| point.id.and_then(|pid| pid.point_id_options))
-            .collect();
-
-        if points.is_empty() {
-            Ok(())
-        } else {
-            Err(Invariant(format!(
-                "detected {} points missing the '{}' payload key when matching for null values:\n{:?}",
-                points.len(),
-                MANDATORY_PAYLOAD_TIMESTAMP_KEY,
-                points,
-            )))
-        }
-    }
-
-    async fn check_filter_bool_index(
-        &self,
-        client: &Qdrant,
-        current_count: usize,
-    ) -> Result<(), CrasherError> {
-        let resp = client
-            .scroll(
-                ScrollPointsBuilder::new(&self.collection_name)
-                    .filter(Filter::must([Condition::matches(
-                        MANDATORY_PAYLOAD_BOOL_KEY,
-                        true,
-                    )]))
-                    .limit(current_count as u32),
-            )
-            .await?;
-        let points: AHashSet<_> = resp
-            .result
-            .into_iter()
-            .filter_map(|point| {
-                point.id.and_then(|pid| {
-                    pid.point_id_options.and_then(|options| match options {
-                        PointIdOptions::Num(id) => Some(id),
-                        PointIdOptions::Uuid(_) => None,
-                    })
-                })
-            })
-            .collect();
-
-        let missing_points: Vec<_> = (0..current_count as u64)
-            .filter(|id| !points.contains(id))
-            .collect();
-
-        if missing_points.is_empty() {
-            Ok(())
-        } else {
-            Err(Invariant(format!(
-                "detected {} points missing the '{}: true' when matching payload:\n{:?}",
-                missing_points.len(),
-                MANDATORY_PAYLOAD_BOOL_KEY,
-                missing_points,
-            )))
-        }
+        let full_report = errors.join("\n---\n");
+        Err(Invariant(format!(
+            "Data inconsistencies found out of {current_count} points:\n{full_report}"
+        )))
     }
 
     fn trigger_continuous_snapshotting(
@@ -661,51 +456,5 @@ async fn churn_collection_snapshot(
         .expect("no snapshot description!")
         .name;
     let _response = delete_collection_snapshot(client, collection_name, &snapshot_name).await?;
-    Ok(())
-}
-
-/// Checks if this is a zeroed vector.
-#[allow(deprecated)]
-fn check_zeroed_vector(vector: &VectorOutput) -> bool {
-    vector
-        .vector
-        .as_ref()
-        .map(|vector| match vector {
-            vector_output::Vector::Dense(dense_vector) => {
-                dense_vector.data.iter().all(|v| *v == 0.0)
-            }
-            vector_output::Vector::Sparse(sparse_vector) => sparse_vector.indices.is_empty(),
-            vector_output::Vector::MultiDense(multi_dense_vector) => multi_dense_vector
-                .vectors
-                .iter()
-                .all(|v| v.data.iter().all(|v| *v == 0.0)),
-        })
-        // else, check the deprecated field
-        .unwrap_or_else(|| vector.data.iter().all(|v| *v == 0.0))
-}
-
-fn check_search_result(results: &QueryBatchResponse) -> Result<(), CrasherError> {
-    // assert no vector is only containing zeros
-    for point in results.result.iter().flat_map(|result| &result.result) {
-        if let Some(vectors) = point
-            .vectors
-            .as_ref()
-            .and_then(|v| v.vectors_options.as_ref())
-        {
-            let zeroed_vector = match vectors {
-                VectorsOptions::Vector(v) => check_zeroed_vector(v).then_some(("".to_string(), v)),
-                VectorsOptions::Vectors(vectors) => vectors
-                    .vectors
-                    .iter()
-                    .find_map(|(name, v)| check_zeroed_vector(v).then_some((name.to_string(), v))),
-            };
-            if let Some((name, vector)) = zeroed_vector {
-                return Err(Invariant(format!(
-                    "Query result contains zeroed vector: \npoint id: {:?}\nzeroed vector name: {}\nzeroed vector: {:?}\n\npoint: {:?}",
-                    point.id, name, vector, point
-                )));
-            }
-        }
-    }
     Ok(())
 }

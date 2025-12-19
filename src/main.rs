@@ -1,4 +1,5 @@
 mod args;
+mod checker;
 mod client;
 mod crasher_error;
 mod generators;
