@@ -19,7 +19,6 @@ use qdrant_client::qdrant::{
     VectorInput, VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
 use rand::Rng;
-use reqwest::Client;
 use serde_json::Value;
 use serde_json::json;
 use std::collections::HashMap;
@@ -530,6 +529,7 @@ const HTTP_PORT: u32 = 6333;
 pub async fn restore_collection_snapshot(
     collection_name: &str,
     snapshot_name: &str,
+    client: &reqwest::Client,
 ) -> Result<(), CrasherError> {
     let url =
         format!("http://localhost:{HTTP_PORT}/collections/{collection_name}/snapshots/recover");
@@ -541,7 +541,6 @@ pub async fn restore_collection_snapshot(
         )
     });
 
-    let client = Client::new();
     let response = client.put(&url).json(&body).send().await?;
     let status = response.status();
     if !status.is_success() {
@@ -553,9 +552,8 @@ pub async fn restore_collection_snapshot(
     Ok(())
 }
 
-pub async fn get_telemetry() -> Result<String, CrasherError> {
+pub async fn get_telemetry(client: &reqwest::Client) -> Result<String, CrasherError> {
     let url = format!("http://localhost:{HTTP_PORT}/telemetry?details_level=10");
-    let client = Client::new();
     let response = client.get(&url).send().await?;
     if !response.status().is_success() {
         return Err(CrasherError::Invariant(

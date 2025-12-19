@@ -14,6 +14,7 @@ use crate::workload::Workload;
 use clap::Parser;
 use env_logger::Target;
 use qdrant_client::{Qdrant, config::QdrantConfig};
+use reqwest::Client;
 use std::process::exit;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -31,28 +32,38 @@ async fn main() {
     let r = stopped.clone();
 
     ctrlc::set_handler(move || {
-        log::info!("Crasher is stopping");
+        log::info!("Stopping Crasher");
         r.store(true, Ordering::Relaxed);
     })
     .expect("Error setting Ctrl-C handler");
 
-    let client_config = get_config(args.uris.first().unwrap(), args.grpc_timeout_ms);
-    let client = Qdrant::new(client_config).unwrap();
-    let client = Arc::new(client);
-    let args = Arc::new(args);
-    let crash_probability = args.crash_probability;
-    let sleep_duration_between_crash_sec = args.sleep_duration_between_crash_sec;
-
     match ProcessManager::from_args(&args) {
-        Err(err) => {
-            log::error!("Failed to start Qdrant: {err}");
-        }
+        Err(err) => log::error!("Failed to start Qdrant: {err}"),
         Ok(mut process_manager) => {
             match process_manager.child_process.id() {
                 Some(child_process_id) => {
                     log::info!("Child qdrant process id {child_process_id:?}");
+
+                    // gRPC client
+                    let grpc_client_config =
+                        get_grpc_config(args.uris.first().unwrap(), args.grpc_timeout_ms as usize);
+                    let grpc_client = Qdrant::new(grpc_client_config).unwrap();
+                    let grpc_client = Arc::new(grpc_client);
+
+                    // HTTP client
+                    let http_client = Client::builder()
+                        .timeout(Duration::from_millis(args.http_timeout_ms))
+                        .connect_timeout(Duration::from_millis(args.http_timeout_ms))
+                        .user_agent("crasher :fire:")
+                        .build()
+                        .unwrap();
+
+                    let crash_probability = args.crash_probability;
+                    let sleep_duration_between_crash_sec = args.sleep_duration_between_crash_sec;
+
                     log::info!("Waiting for qdrant to be ready...");
-                    if let Err(err) = wait_server_ready(&client, stopped.clone(), false).await {
+                    if let Err(err) = wait_server_ready(&grpc_client, stopped.clone(), false).await
+                    {
                         log::error!("Failed to wait for qdrant to be ready: {err:?}");
                         exit(1)
                     }
@@ -66,7 +77,7 @@ async fn main() {
                     let (rng_seed, mut workload_rng, mut chaos_rng) = create_rngs(args.rng_seed);
 
                     // workload task
-                    let client_worker = client.clone();
+                    let client_worker = grpc_client.clone();
                     let workload = Workload::new(
                         collection_name,
                         stopped.clone(),
@@ -76,9 +87,11 @@ async fn main() {
                         args.vector_dimension,
                         rng_seed,
                     );
-
+                    let args = Arc::new(args);
                     let workload_task = tokio::spawn(async move {
-                        workload.work(&client_worker, args, &mut workload_rng).await;
+                        workload
+                            .work(&client_worker, &http_client, args, &mut workload_rng)
+                            .await;
                     });
 
                     // get started a bit before chaos
@@ -90,7 +103,7 @@ async fn main() {
                             .chaos(
                                 stopped,
                                 crash_lock,
-                                &client,
+                                &grpc_client,
                                 crash_probability as f64,
                                 sleep_duration_between_crash_sec,
                                 &mut chaos_rng,
@@ -110,7 +123,7 @@ async fn main() {
     }
 }
 
-fn get_config(url: &str, timeout_ms: usize) -> QdrantConfig {
+fn get_grpc_config(url: &str, timeout_ms: usize) -> QdrantConfig {
     Qdrant::from_url(url)
         .timeout(Duration::from_millis(timeout_ms as u64))
         .connect_timeout(Duration::from_millis(timeout_ms as u64))

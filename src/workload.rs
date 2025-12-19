@@ -13,7 +13,7 @@ use qdrant_client::qdrant::{
 use rand::Rng;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 
@@ -75,12 +75,18 @@ impl Workload {
 }
 
 impl Workload {
-    pub async fn work(&self, client: &Qdrant, args: Arc<Args>, rng: &mut impl Rng) {
+    pub async fn work(
+        &self,
+        client: &Qdrant,
+        http_client: &reqwest::Client,
+        args: Arc<Args>,
+        rng: &mut impl Rng,
+    ) {
         loop {
             if self.stopped.load(Ordering::Relaxed) {
                 break;
             }
-            let run = self.run(client, args.clone(), rng).await;
+            let run = self.run(client, http_client, args.clone(), rng).await;
             match run {
                 Ok(()) => {
                     log::info!("Workload run finished");
@@ -94,9 +100,6 @@ impl Workload {
                         "Workload run failed due to an invariant violation! (rng_seed:{})\n{msg}",
                         self.rng_seed
                     );
-                    // Uncomment to display telemetry for debugging
-                    //let telemetry = get_telemetry().await.unwrap_or_default();
-                    //log::error!("Telemetry:\n{}", telemetry);
                     // send stop signal to the main thread
                     self.stopped.store(true, Ordering::Relaxed);
                     log::info!("Stopping the workload...");
@@ -125,9 +128,11 @@ impl Workload {
     pub async fn run(
         &self,
         client: &Qdrant,
+        http_client: &reqwest::Client,
         args: Arc<Args>,
         rng: &mut impl Rng,
     ) -> Result<(), CrasherError> {
+        let start = Instant::now();
         log::info!("Starting workload...");
         // create and populate collection if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
@@ -275,7 +280,8 @@ impl Workload {
                 let _crash_lock_guard = self.crash_lock.lock().await;
                 for snapshot_name in &snapshots {
                     log::info!("Run: restoring snapshot '{snapshot_name}'");
-                    restore_collection_snapshot(&self.collection_name, snapshot_name).await?;
+                    restore_collection_snapshot(&self.collection_name, snapshot_name, http_client)
+                        .await?;
 
                     delete_collection_snapshot(client, &self.collection_name, snapshot_name)
                         .await?;
@@ -365,17 +371,17 @@ impl Workload {
         }
 
         log::info!("Run: get full telemetry");
-        let _telemetry = get_telemetry().await?;
+        let _telemetry = get_telemetry(http_client).await?;
 
         // Stop ongoing snapshotting task
         snapshotting_handle.abort();
         match snapshotting_handle.await {
             Ok(Ok(())) => (),
-            Err(_) => (),                                      // ignore JoinError
+            Err(_join_error) => (),                            // ignore JoinError
             Ok(Err(snapshot_err)) => return Err(snapshot_err), // capture failed snapshot
         }
 
-        log::info!("Workload finished");
+        log::info!("Workload finished in {:?}", start.elapsed());
         Ok(())
     }
 

@@ -50,8 +50,11 @@ pub struct Args {
     #[arg(long)]
     pub memmap_threshold: Option<u32>,
     /// Timeout of gRPC client
-    #[arg(long, default_value_t = 10_000)]
-    pub grpc_timeout_ms: usize,
+    #[arg(long, default_value_t = 20_000)]
+    pub grpc_timeout_ms: u64,
+    /// Timeout of HTTP client
+    #[arg(long, default_value_t = 60_000)]
+    pub http_timeout_ms: u64,
     /// Whether to use on-disk payload storage
     #[arg(long, default_value_t = true)]
     pub on_disk_payload: bool,
