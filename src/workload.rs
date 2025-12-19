@@ -1,5 +1,6 @@
 use ahash::AHashSet;
 use anyhow::Result;
+use futures::stream::{self, StreamExt, TryStreamExt};
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_output::VectorsOptions;
@@ -392,11 +393,22 @@ impl Workload {
         let mut missing_points_errors: Vec<usize> = Vec::new();
         let mut malformed_points_errors: Vec<String> = Vec::new();
 
-        // by batches to not overload the server
-        for ids in all_ids.chunks(current_count.min(1000)) {
-            let response = retrieve_points(client, &self.collection_name, ids).await?;
+        // Stream process checks by batches to not overload the server
+        let min_batch_size = 1_000;
+        let ids_batch: Vec<Arc<[usize]>> = all_ids
+            .chunks(current_count.min(min_batch_size))
+            .map(Arc::from)
+            .collect();
+        let mut retrieve_points_f = stream::iter(ids_batch)
+            .map(|ids| async {
+                let resp = retrieve_points(client, &self.collection_name, &ids).await?;
+                Ok::<_, CrasherError>((ids, resp))
+            })
+            .buffered(1);
+
+        while let Some((expected_ids, response)) = retrieve_points_f.try_next().await? {
             // check if missing points
-            if response.result.len() != ids.len() {
+            if response.result.len() != expected_ids.len() {
                 let response_ids = response
                     .result
                     .iter()
@@ -407,7 +419,7 @@ impl Workload {
                     })
                     .collect::<AHashSet<_>>();
 
-                let missing_ids = ids
+                let missing_ids = expected_ids
                     .iter()
                     .filter(|&id| !response_ids.contains(id))
                     .copied()
