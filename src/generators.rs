@@ -23,6 +23,7 @@ pub const DENSE_VECTOR_NAME_PQ: &str = "dense-vector-pq";
 pub const DENSE_VECTOR_NAME_BQ_1B: &str = "dense-vector-bq-1b";
 pub const DENSE_VECTOR_NAME_BQ_1HB: &str = "dense-vector-bq-1Hb";
 pub const DENSE_VECTOR_NAME_BQ_2B: &str = "dense-vector-bq-2b";
+pub const DENSE_VECTOR_NAME_HNSW_INLINE: &str = "dense-vector-hnsw-inline";
 
 /// Sparse vectors base names
 pub const SPARSE_VECTOR_NAME_INDEX_DISK: &str = "sparse-vector-index-disk";
@@ -77,6 +78,17 @@ impl TestNamedVectors {
             on_disk: Some(false),
             payload_m: None,
             inline_storage: None,
+        });
+
+        // warning: requires Quantization
+        let hnsw_config_inline_storage = Some(HnswConfigDiff {
+            m: Some(32),
+            ef_construct: None,
+            full_scan_threshold: None,
+            max_indexing_threads: None,
+            on_disk: Some(false),
+            payload_m: None,
+            inline_storage: Some(true),
         });
 
         // dense vectors on disk
@@ -254,6 +266,29 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
+                    on_disk: Some(true), // on disk
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors with HNSW inlined storage
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_HNSW_INLINE}-{i}");
+
+            let bq_builder =
+                BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::TwoBits);
+
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Binary(bq_builder.build())),
+                    }),
+                    hnsw_config: hnsw_config_inline_storage,
                     on_disk: Some(true), // on disk
                     datatype: None,
                     multivector_config: None,
