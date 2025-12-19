@@ -28,7 +28,7 @@ pub async fn check_points_consistency(
     let mut missing_points_errors: Vec<usize> = Vec::new();
     let mut malformed_points_errors: Vec<String> = Vec::new();
 
-    // Stream process checks by batches to not overload the server
+    // Stream checks by batches to not overload the server
     let min_batch_size = 1_000;
     let ids_batch: Vec<Arc<[usize]>> = all_ids
         .chunks(current_count.min(min_batch_size))
@@ -74,6 +74,7 @@ pub async fn check_points_consistency(
                             ));
                         }
                         VectorsOptions::Vectors(named_vectors) => {
+                            // TODO check that all generated named vectors are present
                             if named_vectors.vectors.is_empty() {
                                 malformed_points_errors
                                     .push(format!("Named vector {point_id:?} should not be empty"));

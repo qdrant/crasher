@@ -83,13 +83,14 @@ impl Workload {
             if self.stopped.load(Ordering::Relaxed) {
                 break;
             }
+            let start = Instant::now();
             let run = self.run(client, http_client, args.clone(), rng).await;
             match run {
                 Ok(()) => {
-                    log::info!("Workload run finished");
+                    log::info!("Workload finished in {:?}", start.elapsed());
                 }
                 Err(Cancelled) => {
-                    log::info!("Workload run cancelled");
+                    log::info!("Workload cancelled after {:?}", start.elapsed());
                     break;
                 }
                 Err(Invariant(msg)) => {
@@ -129,7 +130,6 @@ impl Workload {
         args: Arc<Args>,
         rng: &mut impl Rng,
     ) -> Result<(), CrasherError> {
-        let start = Instant::now();
         log::info!("Starting workload...");
         // create and populate collection if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
@@ -269,36 +269,44 @@ impl Workload {
 
             log::info!("Run: delete existing points ({current_count} points)");
             delete_points(client, &self.collection_name, current_count).await?;
+        }
 
-            let snapshots = list_collection_snapshots(client, &self.collection_name).await?;
-            if !snapshots.is_empty() {
-                log::info!("Found {} local collection snapshots", snapshots.len());
-                // Do not crash during restore as it would leave a dummy shard behind & make sure we delete snapshots
-                let _crash_lock_guard = self.crash_lock.lock().await;
-                for snapshot_name in &snapshots {
-                    log::info!("Run: restoring snapshot '{snapshot_name}'");
-                    restore_collection_snapshot(&self.collection_name, snapshot_name, http_client)
-                        .await?;
-
-                    delete_collection_snapshot(client, &self.collection_name, snapshot_name)
-                        .await?;
-                    let restored_count =
-                        get_exact_points_count(client, &self.collection_name).await?;
-
-                    if restored_count == 0 {
-                        log::info!("Snapshot `{snapshot_name}` does not contain any points");
-                        continue;
-                    }
-
-                    log::info!(
-                        "Run: data consistency check over {restored_count} points restored for snapshot '{snapshot_name}'"
-                    );
-                    self.data_consistency_check(client, restored_count).await?;
-
-                    delete_points(client, &self.collection_name, restored_count).await?;
+        // Validate existing collection snapshots
+        let snapshots = list_collection_snapshots(client, &self.collection_name).await?;
+        if !snapshots.is_empty() {
+            log::info!("Found {} local collection snapshots", snapshots.len());
+            // Do not crash during restore as it would leave a dummy shard behind & make sure we delete snapshots
+            let _crash_lock_guard = self.crash_lock.lock().await;
+            for snapshot_name in &snapshots {
+                // Make sure everything was deleted before the snapshot restore
+                let after_delete_count =
+                    get_exact_points_count(client, &self.collection_name).await?;
+                if after_delete_count != 0 {
+                    return Err(Invariant(format!(
+                        "Expected zero points before restoring snapshot but got {after_delete_count}"
+                    )));
                 }
-                log::info!("All snapshots validated and deleted!");
+
+                log::info!("Run: restoring snapshot '{snapshot_name}'");
+                restore_collection_snapshot(&self.collection_name, snapshot_name, http_client)
+                    .await?;
+
+                delete_collection_snapshot(client, &self.collection_name, snapshot_name).await?;
+                let restored_count = get_exact_points_count(client, &self.collection_name).await?;
+
+                if restored_count == 0 {
+                    log::info!("Snapshot `{snapshot_name}` does not contain any points");
+                    continue;
+                }
+
+                log::info!(
+                    "Run: data consistency check over {restored_count} points restored for snapshot '{snapshot_name}'"
+                );
+                self.data_consistency_check(client, restored_count).await?;
+
+                delete_points(client, &self.collection_name, restored_count).await?;
             }
+            log::info!("All snapshots validated and deleted!");
         }
 
         log::info!("Run: trigger collection snapshot in the background");
@@ -378,7 +386,6 @@ impl Workload {
             Ok(Err(snapshot_err)) => return Err(snapshot_err), // capture failed snapshot
         }
 
-        log::info!("Workload finished in {:?}", start.elapsed());
         Ok(())
     }
 
