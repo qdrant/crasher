@@ -283,10 +283,11 @@ impl Workload {
         // Validate and clean up existing data
         let current_count = get_exact_points_count(client, &self.collection_name).await?;
         let confirmed_point_id = self.get_max_confirmed_point_id();
-        let checkable_points = std::cmp::min(current_count as u64, confirmed_point_id) as usize;
+        let confirmed_point_count = confirmed_point_id + 1; // Starts from zero
+        let checkable_points = std::cmp::min(current_count as u64, confirmed_point_count) as usize;
         if current_count != 0 {
             log::info!(
-                "Run: previous data consistency check ({confirmed_point_id} / {current_count} points)"
+                "Run: previous data consistency check ({confirmed_point_count} / {current_count} points)"
             );
             self.data_consistency_check(client, checkable_points)
                 .await?;
@@ -355,6 +356,7 @@ impl Workload {
         )
         .await?;
 
+        // All written points should be confirmed here, as insert_points_batch waits for completion
         let points_count = get_exact_points_count(client, &self.collection_name).await?;
         log::info!("Run: post-point-insert data consistency check");
         self.data_consistency_check(client, points_count).await?;
@@ -379,6 +381,7 @@ impl Workload {
             .await?;
         }
 
+        // Set-payload should not remove any points, so count should remain the same
         log::info!("Run: post-payload-insert data consistency check");
         self.data_consistency_check(client, points_count).await?;
 
