@@ -383,6 +383,13 @@ pub async fn insert_points_batch(
             return Err(Cancelled);
         }
 
+        let inserting_points: Vec<_> = points.iter().map(|p| match p.id.as_ref().unwrap().point_id_options.as_ref().unwrap() {
+            PointIdOptions::Num(id) => *id,
+            PointIdOptions::Uuid(_) => unreachable!("UUIDs are not supported"),
+        }).collect::<Vec<_>>();
+
+        log::info!("Inserting points: {inserting_points:?}");
+
         let _resp = client
             .upsert_points(
                 UpsertPointsBuilder::new(collection_name, points)
