@@ -7,6 +7,7 @@ use crate::generators::{
     random_dense_vector, random_filter, random_payload, random_sparse_vector,
 };
 use qdrant_client::Qdrant;
+use qdrant_client::qdrant::Filter;
 use qdrant_client::qdrant::payload_index_params::IndexParams;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
@@ -311,6 +312,7 @@ pub async fn insert_points_batch(
     write_ordering: Option<WriteOrdering>,
     stopped: Arc<AtomicBool>,
     rng: &mut impl Rng,
+    on_batch_confirmation: impl Fn(u64) + Send + Sync,
 ) -> Result<(), CrasherError> {
     let max_batch_size = 10;
     // handle less than batch & spill over
@@ -383,12 +385,19 @@ pub async fn insert_points_batch(
             return Err(Cancelled);
         }
 
-        let inserting_points: Vec<_> = points.iter().map(|p| match p.id.as_ref().unwrap().point_id_options.as_ref().unwrap() {
-            PointIdOptions::Num(id) => *id,
-            PointIdOptions::Uuid(_) => unreachable!("UUIDs are not supported"),
-        }).collect::<Vec<_>>();
+        let inserting_points: Vec<_> = points
+            .iter()
+            .map(
+                |p| match p.id.as_ref().unwrap().point_id_options.as_ref().unwrap() {
+                    PointIdOptions::Num(id) => *id,
+                    PointIdOptions::Uuid(_) => unreachable!("UUIDs are not supported"),
+                },
+            )
+            .collect::<Vec<_>>();
 
         log::info!("Inserting points: {inserting_points:?}");
+
+        let max_point_id = inserting_points.iter().max().unwrap();
 
         let _resp = client
             .upsert_points(
@@ -397,6 +406,8 @@ pub async fn insert_points_batch(
                     .wait(wait),
             )
             .await?;
+        // Assume response is successful if we are here
+        on_batch_confirmation(*max_point_id);
     }
     Ok(())
 }
@@ -471,13 +482,8 @@ pub async fn retrieve_points(
 pub async fn delete_points(
     client: &Qdrant,
     collection_name: &str,
-    points_count: usize,
 ) -> Result<(), CrasherError> {
-    let points_selector = (0..points_count as u64)
-        .map(|id| PointId {
-            point_id_options: Some(PointIdOptions::Num(id)),
-        })
-        .collect::<Vec<_>>();
+    let points_selector = Filter::must([]);
 
     // delete all points
     client
