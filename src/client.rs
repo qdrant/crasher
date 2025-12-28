@@ -479,10 +479,7 @@ pub async fn retrieve_points(
 }
 
 /// delete points (blocking)
-pub async fn delete_points(
-    client: &Qdrant,
-    collection_name: &str,
-) -> Result<(), CrasherError> {
+pub async fn delete_points(client: &Qdrant, collection_name: &str) -> Result<(), CrasherError> {
     let points_selector = Filter::must([]);
 
     // delete all points

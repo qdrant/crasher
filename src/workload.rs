@@ -292,7 +292,7 @@ impl Workload {
             self.data_consistency_check(client, checkable_points)
                 .await?;
 
-            log::info!("Run: delete existing points (all points byt filter)");
+            log::info!("Run: delete existing points (all points by filter)");
             delete_points(client, &self.collection_name).await?;
             self.reset_max_confirmed_point_id()
         }
