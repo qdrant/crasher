@@ -7,7 +7,7 @@ use qdrant_client::qdrant::{
 };
 use rand::Rng;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
@@ -40,6 +40,9 @@ pub struct Workload {
     stopped: Arc<AtomicBool>,
     crash_lock: Arc<tokio::sync::Mutex<()>>, // take lock to prevent crash
     rng_seed: u64,
+    // Largest point id written and confirmed by Qdrant
+    // Confirmation means, that API responded with `Completed` status for upsert request
+    max_confirmed_point_id: Arc<AtomicU64>,
 }
 
 impl Workload {
@@ -67,7 +70,21 @@ impl Workload {
             stopped,
             crash_lock,
             rng_seed,
+            max_confirmed_point_id: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    fn reset_max_confirmed_point_id(&self) {
+        self.max_confirmed_point_id.store(0, Ordering::Relaxed);
+    }
+
+    fn get_max_confirmed_point_id(&self) -> u64 {
+        self.max_confirmed_point_id.load(Ordering::Relaxed)
+    }
+
+    fn set_max_confirmed_point_id(&self, point_id: u64) {
+        self.max_confirmed_point_id
+            .store(point_id, Ordering::Relaxed);
     }
 }
 
@@ -133,6 +150,8 @@ impl Workload {
         log::info!("Starting workload...");
         // create and populate collection if it does not exist
         if !client.collection_exists(&self.collection_name).await? {
+            self.reset_max_confirmed_point_id();
+
             log::info!("Creating workload collection");
             create_collection(
                 client,
@@ -263,12 +282,19 @@ impl Workload {
 
         // Validate and clean up existing data
         let current_count = get_exact_points_count(client, &self.collection_name).await?;
+        let confirmed_point_id = self.get_max_confirmed_point_id();
+        let confirmed_point_count = confirmed_point_id + 1; // Starts from zero
+        let checkable_points = std::cmp::min(current_count as u64, confirmed_point_count) as usize;
         if current_count != 0 {
-            log::info!("Run: previous data consistency check ({current_count} points)");
-            self.data_consistency_check(client, current_count).await?;
+            log::info!(
+                "Run: previous data consistency check ({confirmed_point_count} / {current_count} points)"
+            );
+            self.data_consistency_check(client, checkable_points)
+                .await?;
 
-            log::info!("Run: delete existing points ({current_count} points)");
-            delete_points(client, &self.collection_name, current_count).await?;
+            log::info!("Run: delete existing points (all points by filter)");
+            delete_points(client, &self.collection_name).await?;
+            self.reset_max_confirmed_point_id()
         }
 
         // Validate existing collection snapshots
@@ -304,7 +330,8 @@ impl Workload {
                 );
                 self.data_consistency_check(client, restored_count).await?;
 
-                delete_points(client, &self.collection_name, restored_count).await?;
+                delete_points(client, &self.collection_name).await?;
+                self.reset_max_confirmed_point_id()
             }
             log::info!("All snapshots validated and deleted!");
         }
@@ -325,9 +352,11 @@ impl Workload {
             None,
             self.stopped.clone(),
             rng,
+            |inserted_id| self.set_max_confirmed_point_id(inserted_id),
         )
         .await?;
 
+        // All written points should be confirmed here, as insert_points_batch waits for completion
         let points_count = get_exact_points_count(client, &self.collection_name).await?;
         log::info!("Run: post-point-insert data consistency check");
         self.data_consistency_check(client, points_count).await?;
@@ -352,6 +381,7 @@ impl Workload {
             .await?;
         }
 
+        // Set-payload should not remove any points, so count should remain the same
         log::info!("Run: post-payload-insert data consistency check");
         self.data_consistency_check(client, points_count).await?;
 
