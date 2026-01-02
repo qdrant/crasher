@@ -7,7 +7,7 @@ use qdrant_client::qdrant::{
 };
 use rand::Rng;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
@@ -42,7 +42,7 @@ pub struct Workload {
     rng_seed: u64,
     // Largest point id written and confirmed by Qdrant
     // Confirmation means, that API responded with `Completed` status for upsert request
-    max_confirmed_point_id: Arc<AtomicU64>,
+    max_confirmed_point_id: Arc<AtomicI64>,
 }
 
 impl Workload {
@@ -70,21 +70,26 @@ impl Workload {
             stopped,
             crash_lock,
             rng_seed,
-            max_confirmed_point_id: Arc::new(AtomicU64::new(0)),
+            max_confirmed_point_id: Arc::new(AtomicI64::new(-1)),
         }
     }
 
     fn reset_max_confirmed_point_id(&self) {
-        self.max_confirmed_point_id.store(0, Ordering::Relaxed);
+        self.max_confirmed_point_id.store(-1, Ordering::Relaxed);
     }
 
-    fn get_max_confirmed_point_id(&self) -> u64 {
-        self.max_confirmed_point_id.load(Ordering::Relaxed)
+    fn get_max_confirmed_point_id(&self) -> Option<u64> {
+        let max_confirmed_id = self.max_confirmed_point_id.load(Ordering::Relaxed);
+        if max_confirmed_id < 0 {
+            None
+        } else {
+            Some(max_confirmed_id as u64)
+        }
     }
 
     fn set_max_confirmed_point_id(&self, point_id: u64) {
         self.max_confirmed_point_id
-            .store(point_id, Ordering::Relaxed);
+            .store(point_id as i64, Ordering::Relaxed);
     }
 }
 
@@ -282,8 +287,10 @@ impl Workload {
 
         // Validate and clean up existing data
         let current_count = get_exact_points_count(client, &self.collection_name).await?;
-        let confirmed_point_id = self.get_max_confirmed_point_id();
-        let confirmed_point_count = confirmed_point_id + 1; // Starts from zero
+        let confirmed_point_count = match self.get_max_confirmed_point_id() {
+            None => 0,
+            Some(point_id) => point_id + 1,
+        };
         let checkable_points = std::cmp::min(current_count as u64, confirmed_point_count) as usize;
         if current_count != 0 {
             log::info!(
