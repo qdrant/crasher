@@ -49,7 +49,6 @@ async fn main() {
                     let grpc_client_config =
                         get_grpc_config(args.uris.first().unwrap(), args.grpc_timeout_ms as usize);
                     let grpc_client = Qdrant::new(grpc_client_config).unwrap();
-                    let grpc_client = Arc::new(grpc_client);
 
                     // HTTP client
                     let http_client = Client::builder()
@@ -78,7 +77,6 @@ async fn main() {
                     let (rng_seed, mut workload_rng, mut chaos_rng) = create_rngs(args.rng_seed);
 
                     // workload task
-                    let client_worker = grpc_client.clone();
                     let workload = Workload::new(
                         collection_name,
                         stopped.clone(),
@@ -89,6 +87,7 @@ async fn main() {
                         rng_seed,
                     );
                     let args = Arc::new(args);
+                    let client_worker = grpc_client.clone();
                     let workload_task = tokio::spawn(async move {
                         workload
                             .work(&client_worker, &http_client, args, &mut workload_rng)

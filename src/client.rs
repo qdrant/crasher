@@ -49,9 +49,8 @@ pub async fn wait_server_ready(
                     return Err(CrasherError::Invariant(
                         "Server did not start in time, /readyz not ready".to_string(),
                     ));
-                } else {
-                    log::debug!("Healthcheck failed: {err:?}")
                 }
+                log::debug!("Healthcheck failed: {err:?}");
             }
         }
     }
@@ -250,7 +249,9 @@ pub async fn create_collection(
         map: sparse_vector_params,
     };
 
-    let dense_vectors_config = if !args.only_sparse {
+    let dense_vectors_config = if args.only_sparse {
+        None
+    } else {
         let mut all_dense_params = HashMap::new();
 
         // dense vectors
@@ -266,8 +267,6 @@ pub async fn create_collection(
                 map: all_dense_params,
             })),
         })
-    } else {
-        None
     };
 
     let mut request = CreateCollectionBuilder::new(collection_name)

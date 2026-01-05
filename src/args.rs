@@ -46,7 +46,7 @@ pub struct Args {
     /// Optimizer indexing threshold
     #[arg(long)]
     pub indexing_threshold: Option<u32>,
-    /// Maximum size (in KiloBytes) of vectors to store in-memory per segment.
+    /// Maximum size (in `KiloBytes`) of vectors to store in-memory per segment.
     #[arg(long)]
     pub memmap_threshold: Option<u32>,
     /// Timeout of gRPC client

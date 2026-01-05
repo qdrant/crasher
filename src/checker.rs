@@ -135,7 +135,7 @@ pub async fn check_points_consistency(
         Ok(())
     } else {
         let errors_rendered = errors_found.join("/n");
-        Err(Invariant(errors_rendered.to_string()))
+        Err(Invariant(errors_rendered))
     }
 }
 
@@ -244,11 +244,11 @@ pub fn check_search_result(results: &QueryBatchResponse) -> Result<(), CrasherEr
             .and_then(|v| v.vectors_options.as_ref())
         {
             let zeroed_vector = match vectors {
-                VectorsOptions::Vector(v) => check_zeroed_vector(v).then_some(("".to_string(), v)),
+                VectorsOptions::Vector(v) => check_zeroed_vector(v).then_some((String::new(), v)),
                 VectorsOptions::Vectors(vectors) => vectors
                     .vectors
                     .iter()
-                    .find_map(|(name, v)| check_zeroed_vector(v).then_some((name.to_string(), v))),
+                    .find_map(|(name, v)| check_zeroed_vector(v).then_some((name.clone(), v))),
             };
             if let Some((name, vector)) = zeroed_vector {
                 return Err(Invariant(format!(

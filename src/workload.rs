@@ -59,7 +59,7 @@ impl Workload {
         let query_count = 2; //hardcoded
         let test_named_vectors = TestNamedVectors::new(duplication_factor, vec_dim);
         let write_ordering = None; // default
-        Workload {
+        Self {
             collection_name: collection_name.to_string(),
             test_named_vectors,
             query_count,
@@ -133,13 +133,12 @@ impl Workload {
                         // send stop signal to the main thread
                         self.stopped.store(true, Ordering::Relaxed);
                         break;
-                    } else {
-                        log::warn!(
-                            "Workload run failed due to client error - resuming soon\n{error:?}"
-                        );
-                        // no need to hammer the server while it restarts
-                        sleep(Duration::from_secs(3)).await;
                     }
+                    log::warn!(
+                        "Workload run failed due to client error - resuming soon\n{error:?}"
+                    );
+                    // no need to hammer the server while it restarts
+                    sleep(Duration::from_secs(3)).await;
                 }
             }
         }
@@ -301,7 +300,7 @@ impl Workload {
 
             log::info!("Run: delete existing points (all points by filter)");
             delete_points(client, &self.collection_name).await?;
-            self.reset_max_confirmed_point_id()
+            self.reset_max_confirmed_point_id();
         }
 
         // Validate existing collection snapshots
@@ -338,7 +337,7 @@ impl Workload {
                 self.data_consistency_check(client, restored_count).await?;
 
                 delete_points(client, &self.collection_name).await?;
-                self.reset_max_confirmed_point_id()
+                self.reset_max_confirmed_point_id();
             }
             log::info!("All snapshots validated and deleted!");
         }

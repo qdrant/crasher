@@ -552,7 +552,7 @@ const WORDS: [&str; 8] = ["the", "quick", "fox", "jumps", "over", "the", "lazy",
 
 pub fn random_sentence(rng: &mut impl Rng, num_variants: u32) -> String {
     let variant = rng.random_range(0..num_variants);
-    let words: Vec<_> = WORDS.iter().take(variant as usize).cloned().collect();
+    let words: Vec<_> = WORDS.iter().take(variant as usize).copied().collect();
     words.join(" ")
 }
 
