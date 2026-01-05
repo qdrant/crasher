@@ -291,7 +291,7 @@ impl Workload {
             Some(point_id) => point_id + 1,
         };
         let checkable_points = std::cmp::min(current_count as u64, confirmed_point_count) as usize;
-        if current_count != 0 {
+        if checkable_points != 0 {
             log::info!(
                 "Run: previous data consistency check ({confirmed_point_count} / {current_count} points)"
             );
