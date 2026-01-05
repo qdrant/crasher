@@ -44,20 +44,24 @@ Options:
       --indexing-threshold <INDEXING_THRESHOLD>
           Optimizer indexing threshold
       --memmap-threshold <MEMMAP_THRESHOLD>
-          Maximum size (in KiloBytes) of vectors to store in-memory per segment
+          Maximum size (in `KiloBytes`) of vectors to store in-memory per segment
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
-          Timeout of gRPC client [default: 10000]
+          Timeout of gRPC client [default: 20000]
+      --http-timeout-ms <HTTP_TIMEOUT_MS>
+          Timeout of HTTP client [default: 60000]
       --on-disk-payload
           Whether to use on-disk payload storage
       --only-sparse
           Whether to only upsert sparse vectors
       --duplication-factor <DUPLICATION_FACTOR>
           Duplication factor for generating additional named vectors [default: 2]
+      --skip-snapshot-restore
+          Whether to perform snapshot restore
       --shutdown-on-error
           Whether to shut down qdrant on error (use false to investigate deadlocks)
       --cpu-quota <CPU_QUOTA>
           CPU quotas in percent for the Qdrant binary
-      --fixed-seed <FIXED_SEED>
+      --rng-seed <RNG_SEED>
           Seed for internal RNG
   -h, --help
           Print help

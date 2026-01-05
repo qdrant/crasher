@@ -319,6 +319,13 @@ impl Workload {
                     )));
                 }
 
+                if args.skip_snapshot_restore {
+                    log::info!("Run: skipping restoring snapshot '{snapshot_name}'");
+                    delete_collection_snapshot(client, &self.collection_name, snapshot_name)
+                        .await?;
+                    continue;
+                }
+
                 log::info!("Run: restoring snapshot '{snapshot_name}'");
                 restore_collection_snapshot(&self.collection_name, snapshot_name, http_client)
                     .await?;
