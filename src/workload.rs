@@ -295,7 +295,7 @@ impl Workload {
             log::info!(
                 "Run: previous data consistency check ({confirmed_point_count} / {current_count} points)"
             );
-            self.data_consistency_check(client, checkable_points)
+            self.data_consistency_check(client, checkable_points, "post-crash-check")
                 .await?;
 
             log::info!("Run: delete existing points (all points by filter)");
@@ -334,7 +334,8 @@ impl Workload {
                 log::info!(
                     "Run: data consistency check over {restored_count} points restored for snapshot '{snapshot_name}'"
                 );
-                self.data_consistency_check(client, restored_count).await?;
+                self.data_consistency_check(client, restored_count, "snapshot-restore-check")
+                    .await?;
 
                 delete_points(client, &self.collection_name).await?;
                 self.reset_max_confirmed_point_id();
@@ -365,7 +366,8 @@ impl Workload {
         // All written points should be confirmed here, as insert_points_batch waits for completion
         let points_count = get_exact_points_count(client, &self.collection_name).await?;
         log::info!("Run: post-point-insert data consistency check");
-        self.data_consistency_check(client, points_count).await?;
+        self.data_consistency_check(client, points_count, "post-insert-check")
+            .await?;
 
         log::info!("Run: set payload");
         for point_id in 1..self.points_count {
@@ -389,7 +391,8 @@ impl Workload {
 
         // Set-payload should not remove any points, so count should remain the same
         log::info!("Run: post-payload-insert data consistency check");
-        self.data_consistency_check(client, points_count).await?;
+        self.data_consistency_check(client, points_count, "post-set-payload-check")
+            .await?;
 
         log::info!("Run: query random vectors");
         for _i in 0..self.query_count {
@@ -433,6 +436,7 @@ impl Workload {
         &self,
         client: &Qdrant,
         current_count: usize,
+        context: &str,
     ) -> Result<(), CrasherError> {
         let mut errors = Vec::new();
 
@@ -462,7 +466,7 @@ impl Workload {
         }
         let full_report = errors.join("\n---\n");
         Err(Invariant(format!(
-            "Data inconsistencies found out of {current_count} points:\n{full_report}"
+            "Data inconsistencies found out of {current_count} points ({context}):\n{full_report}"
         )))
     }
 
