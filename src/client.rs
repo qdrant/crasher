@@ -541,7 +541,8 @@ pub async fn restore_collection_snapshot(
     let body = json!({
         "location": format!(
             "http://localhost:{HTTP_PORT}/collections/{collection_name}/snapshots/{snapshot_name}"
-        )
+        ),
+        "priority": "snapshot"
     });
 
     let response = client.put(&url).json(&body).send().await?;
