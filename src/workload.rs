@@ -351,9 +351,6 @@ impl Workload {
             log::info!("All snapshots validated and deleted!");
         }
 
-        log::info!("Run: trigger collection snapshot in the background");
-        let snapshotting_handle = self.trigger_continuous_snapshotting(client);
-
         log::info!("Run: insert points");
         insert_points_batch(
             client,
@@ -376,6 +373,10 @@ impl Workload {
         log::info!("Run: post-point-insert data consistency check");
         self.data_consistency_check(client, points_count, "post-insert-check")
             .await?;
+
+        // Starts snapshotting process as the data was ingested properly
+        log::info!("Run: trigger collection snapshot in the background");
+        let snapshotting_handle = self.trigger_continuous_snapshotting(client);
 
         log::info!("Run: set payload");
         for point_id in 1..self.points_count {
