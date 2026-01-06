@@ -297,11 +297,12 @@ impl Workload {
             );
             self.data_consistency_check(client, checkable_points, "post-crash-check")
                 .await?;
-
-            log::info!("Run: delete existing points (all points by filter)");
-            delete_points(client, &self.collection_name).await?;
-            self.reset_max_confirmed_point_id();
         }
+
+        // Always delete all points
+        log::info!("Run: delete all existing points");
+        delete_points(client, &self.collection_name).await?;
+        self.reset_max_confirmed_point_id();
 
         // Validate existing collection snapshots
         let snapshots = list_collection_snapshots(client, &self.collection_name).await?;
