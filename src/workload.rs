@@ -309,7 +309,8 @@ impl Workload {
             log::info!("Found {} local collection snapshots", snapshots.len());
             // Do not crash during restore as it would leave a dummy shard behind & make sure we delete snapshots
             let _crash_lock_guard = self.crash_lock.lock().await;
-            for snapshot_name in &snapshots {
+            for snapshot in &snapshots {
+                let snapshot_name = &snapshot.name;
                 // Make sure everything was deleted before the snapshot restore
                 let after_delete_count =
                     get_exact_points_count(client, &self.collection_name).await?;
@@ -504,11 +505,32 @@ async fn churn_collection_snapshot(
     client: &Qdrant,
     collection_name: &str,
 ) -> Result<(), CrasherError> {
-    let response = create_collection_snapshot(client, collection_name).await?;
-    let snapshot_name = response
-        .snapshot_description
-        .expect("no snapshot description!")
-        .name;
-    let _response = delete_collection_snapshot(client, collection_name, &snapshot_name).await?;
+    create_collection_snapshot(client, collection_name).await?;
+    // keep at most the 2 latest snapshots for testing
+    cleanup_old_snapshots(client, collection_name, 2).await?;
+    Ok(())
+}
+
+async fn cleanup_old_snapshots(
+    client: &Qdrant,
+    collection_name: &str,
+    keep: u32,
+) -> Result<(), CrasherError> {
+    let mut snapshots = list_collection_snapshots(client, collection_name).await?;
+    // sort oldest first (smallest number is the oldest date)
+    snapshots.sort_unstable_by_key(|snapshot| snapshot.creation_time.unwrap().seconds);
+
+    // keep and delete rest
+    let total_count = snapshots.len();
+    if total_count <= keep as usize {
+        return Ok(());
+    }
+
+    // Take the first N oldest snapshots and delete them
+    let delete_count = total_count - keep as usize;
+    for snapshot in snapshots.iter().take(delete_count) {
+        delete_collection_snapshot(client, collection_name, &snapshot.name).await?;
+    }
+
     Ok(())
 }

@@ -7,7 +7,6 @@ use crate::generators::{
     random_dense_vector, random_filter, random_payload, random_sparse_vector,
 };
 use qdrant_client::Qdrant;
-use qdrant_client::qdrant::Filter;
 use qdrant_client::qdrant::payload_index_params::IndexParams;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
@@ -19,6 +18,7 @@ use qdrant_client::qdrant::{
     ReplicaState, SetPayloadPointsBuilder, SparseVectorConfig, UpsertPointsBuilder, Vector,
     VectorInput, VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
+use qdrant_client::qdrant::{Filter, SnapshotDescription};
 use rand::Rng;
 use serde_json::Value;
 use serde_json::json;
@@ -520,15 +520,9 @@ pub async fn delete_collection_snapshot(
 pub async fn list_collection_snapshots(
     client: &Qdrant,
     collection_name: &str,
-) -> Result<Vec<String>, CrasherError> {
-    let snapshots = client
-        .list_snapshots(collection_name)
-        .await?
-        .snapshot_descriptions;
-    Ok(snapshots
-        .into_iter()
-        .map(|s| s.name)
-        .collect::<Vec<String>>())
+) -> Result<Vec<SnapshotDescription>, CrasherError> {
+    let snapshots = client.list_snapshots(collection_name).await?;
+    Ok(snapshots.snapshot_descriptions)
 }
 
 // TODO add to config
