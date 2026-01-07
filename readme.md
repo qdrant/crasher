@@ -17,8 +17,8 @@ Usage: crasher [OPTIONS] --working-dir <WORKING_DIR> --exec-path <EXEC_PATH>
 Options:
       --working-dir <WORKING_DIR>
           Working directory for Qdrant data
-      --backup-working-dir <BACKUP_WORKING_DIR>
-          Backup working directory between Qdrant restarts (useful to debug storage recovery issues)
+      --storage-backup <STORAGE_BACKUP>
+          Backup `storage` directory from `working_dir` between Qdrant restarts (useful to debug storage recovery issues)
       --exec-path <EXEC_PATH>
           Path to executable binary relative to `working_dir`
       --crash-probability <CRASH_PROBABILITY>

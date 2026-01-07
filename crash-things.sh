@@ -15,7 +15,7 @@ CRASHER_CMD=(
     cargo run --release
     --
     --working-dir "$QDRANT_DIR"
-    ${QDRANT_BACKUP_DIRS[@]/#/--backup-working-dir } # this does not handle spaces 😬
+    ${QDRANT_BACKUP_DIRS[@]/#/--storage_backup} # this does not handle spaces 😬
     --exec-path "$QDRANT_EXEC"
     --crash-probability "$CRASH_PROBABILITY"
 )
