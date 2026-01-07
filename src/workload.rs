@@ -332,7 +332,6 @@ impl Workload {
                 restore_collection_snapshot(&self.collection_name, snapshot_name, http_client)
                     .await?;
 
-                delete_collection_snapshot(client, &self.collection_name, snapshot_name).await?;
                 let restored_count = get_exact_points_count(client, &self.collection_name).await?;
 
                 if restored_count == 0 {
@@ -343,9 +342,14 @@ impl Workload {
                 log::info!(
                     "Run: data consistency check over {restored_count} points restored for snapshot '{snapshot_name}'"
                 );
-                self.data_consistency_check(client, restored_count, "snapshot-restore-check")
-                    .await?;
-
+                self.data_consistency_check(
+                    client,
+                    restored_count,
+                    &format!("snapshot-restore-check-{snapshot_name}"),
+                )
+                .await?;
+                // cleanup
+                delete_collection_snapshot(client, &self.collection_name, snapshot_name).await?;
                 delete_points(client, &self.collection_name).await?;
                 self.reset_max_confirmed_point_id();
             }

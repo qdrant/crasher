@@ -115,9 +115,9 @@ impl ProcessManager {
         let source_storage_dir = PathBuf::from(&self.working_dir).join("storage");
 
         if backup_exists {
-            fs::remove_dir_all(backup_dir_path)
-                .await
-                .with_context(|| format!("failed to remove backup storage dir {backup_dir_path:?}"))?;
+            fs::remove_dir_all(backup_dir_path).await.with_context(|| {
+                format!("failed to remove backup storage dir {backup_dir_path:?}")
+            })?;
         }
 
         util::copy_dir(&source_storage_dir, backup_dir_path).await?;
