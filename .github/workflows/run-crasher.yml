@@ -17,6 +17,9 @@ on:
       crash_probability:
         description: "Probability to crash, default is 0.3 (30%)"
         default: 0.3
+      points_count:
+        description: "Number of points to insert"
+        default: 5000
 
 env:
   CARGO_TERM_COLOR: always
@@ -43,9 +46,15 @@ jobs:
             crash_probability=0.3
           fi
 
+          points_count="${{ inputs.points_count }}"
+          if [ -z "$points_count" ]; then
+            points_count=500
+          fi
+
           echo "qdrant_version=$qdrant_version" >> $GITHUB_OUTPUT
           echo "crashing_time=$crashing_time" >> $GITHUB_OUTPUT
           echo "crash_probability=$crash_probability" >> $GITHUB_OUTPUT
+          echo "points_count=$points_count" >> $GITHUB_OUTPUT
       - name: Install minimal stable
         uses: dtolnay/rust-toolchain@stable
       - name: Install mold
@@ -95,9 +104,10 @@ jobs:
 
           crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
           crash_probability="${{ steps.default_inputs.outputs.crash_probability }}"
+          points_count="${{ steps.default_inputs.outputs.points_count }}"
           backup_storage_dir="${{ format('{0}/qdrant/storage-backup', github.workspace) }}"
 
-          ./crash-things.sh qdrant ../qdrant-src/target/debug/qdrant "$crash_probability" "$crashing_time" "$backup_storage_dir"
+          ./crash-things.sh qdrant ../qdrant-src/target/debug/qdrant "$crash_probability" "$crashing_time" "$points_count" "$backup_storage_dir"
       - name: Upload logs on failure
         uses: actions/upload-artifact@v4
         if: failure() || cancelled()

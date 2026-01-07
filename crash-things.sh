@@ -6,7 +6,8 @@ QDRANT_DIR=${1:-./qdrant/}
 QDRANT_EXEC=${2:-target/debug/qdrant}
 CRASH_PROBABILITY=${3:-0.3}
 RUN_TIME=${4:-300}
-QDRANT_BACKUP_DIR=${5:?backup directory is required}
+POINTS_COUNT=${5:-5000}
+QDRANT_BACKUP_DIR=${6:?backup directory is required}
 
 CRASHER_LOG=crasher.log
 QDRANT_LOG=../qdrant.log
@@ -18,6 +19,7 @@ CRASHER_CMD=(
     --storage-backup $QDRANT_BACKUP_DIR
     --exec-path "$QDRANT_EXEC"
     --crash-probability "$CRASH_PROBABILITY"
+    --points-count "$POINTS_COUNT"
 )
 
 echo "${CRASHER_CMD[*]}"
