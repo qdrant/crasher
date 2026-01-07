@@ -3,20 +3,26 @@ use crate::args::Args;
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::Cancelled;
 use crate::generators::{
-    MANDATORY_PAYLOAD_BOOL_KEY, MANDATORY_PAYLOAD_TIMESTAMP_KEY, TestNamedVectors,
+    BOOL_PAYLOAD_KEY, DATETIME_PAYLOAD_KEY, FLOAT_PAYLOAD_KEY, GEO_PAYLOAD_KEY,
+    INTEGER_PAYLOAD_KEY, KEYWORD_PAYLOAD_KEY, MANDATORY_PAYLOAD_BOOL_KEY,
+    MANDATORY_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY, TestNamedVectors, UUID_PAYLOAD_KEY,
     random_dense_vector, random_filter, random_payload, random_sparse_vector,
 };
+
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::payload_index_params::IndexParams;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
 use qdrant_client::qdrant::{
-    CollectionInfo, CountPointsBuilder, CreateCollectionBuilder, CreateFieldIndexCollectionBuilder,
-    CreateSnapshotResponse, DeletePointsBuilder, DeleteSnapshotRequestBuilder,
-    DeleteSnapshotResponse, FieldType, GetPointsBuilder, GetResponse, OptimizersConfigDiff,
-    PointId, PointStruct, Query, QueryBatchPointsBuilder, QueryBatchResponse, QueryPoints,
-    ReplicaState, SetPayloadPointsBuilder, SparseVectorConfig, UpsertPointsBuilder, Vector,
-    VectorInput, VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
+    BoolIndexParamsBuilder, CollectionInfo, CountPointsBuilder, CreateCollectionBuilder,
+    CreateFieldIndexCollectionBuilder, CreateSnapshotResponse, DatetimeIndexParamsBuilder,
+    DeletePointsBuilder, DeleteSnapshotRequestBuilder, DeleteSnapshotResponse, FieldType,
+    FloatIndexParamsBuilder, GeoIndexParamsBuilder, GetPointsBuilder, GetResponse,
+    IntegerIndexParamsBuilder, KeywordIndexParamsBuilder, OptimizersConfigDiff, PointId,
+    PointStruct, Query, QueryBatchPointsBuilder, QueryBatchResponse, QueryPoints, ReplicaState,
+    SetPayloadPointsBuilder, SparseVectorConfig, TextIndexParamsBuilder, TokenizerType,
+    UpsertPointsBuilder, UuidIndexParamsBuilder, Vector, VectorInput, VectorParamsMap, Vectors,
+    VectorsConfig, WriteOrdering,
 };
 use qdrant_client::qdrant::{Filter, SnapshotDescription};
 use rand::Rng;
@@ -237,6 +243,12 @@ pub async fn query_batch_points(
     Ok(response)
 }
 
+/// Delete collection
+pub async fn delete_collection(client: &Qdrant, collection_name: &str) -> Result<(), CrasherError> {
+    client.delete_collection(collection_name).await?;
+    Ok(())
+}
+
 /// Create collection
 pub async fn create_collection(
     client: &Qdrant,
@@ -425,6 +437,127 @@ pub async fn create_field_index(
                 .wait(true),
         )
         .await?;
+    Ok(())
+}
+
+pub async fn create_payload_indexes(
+    client: &Qdrant,
+    collection_name: &str,
+) -> Result<(), CrasherError> {
+    // create keyword index for the payload
+    create_field_index(
+        client,
+        collection_name,
+        KEYWORD_PAYLOAD_KEY,
+        FieldType::Keyword,
+        KeywordIndexParamsBuilder::default()
+            .is_tenant(true)
+            .on_disk(true),
+    )
+    .await?;
+
+    // create integer index for the payload
+    create_field_index(
+        client,
+        collection_name,
+        INTEGER_PAYLOAD_KEY,
+        FieldType::Integer,
+        IntegerIndexParamsBuilder::new(true, true)
+            .is_principal(true)
+            .on_disk(true),
+    )
+    .await?;
+
+    // create float index for the payload
+    create_field_index(
+        client,
+        collection_name,
+        FLOAT_PAYLOAD_KEY,
+        FieldType::Float,
+        FloatIndexParamsBuilder::default()
+            .is_principal(true)
+            .on_disk(true),
+    )
+    .await?;
+
+    // create geo index for the payload
+    create_field_index(
+        client,
+        collection_name,
+        GEO_PAYLOAD_KEY,
+        FieldType::Geo,
+        GeoIndexParamsBuilder::default().on_disk(true),
+    )
+    .await?;
+
+    // create text payload index
+    create_field_index(
+        client,
+        collection_name,
+        TEXT_PAYLOAD_KEY,
+        FieldType::Text,
+        TextIndexParamsBuilder::new(TokenizerType::Multilingual)
+            .ascii_folding(true)
+            .snowball_stemmer("english".to_string())
+            .stopwords_language("english".to_string())
+            .phrase_matching(true)
+            .on_disk(true),
+    )
+    .await?;
+
+    // create boolean index for the payload
+    create_field_index(
+        client,
+        collection_name,
+        BOOL_PAYLOAD_KEY,
+        FieldType::Bool,
+        BoolIndexParamsBuilder::new().on_disk(true),
+    )
+    .await?;
+
+    // create timestamp index for payload
+    create_field_index(
+        client,
+        collection_name,
+        DATETIME_PAYLOAD_KEY,
+        FieldType::Datetime,
+        DatetimeIndexParamsBuilder::default()
+            .is_principal(true)
+            .on_disk(true),
+    )
+    .await?;
+
+    // create UUID index for the payload
+    create_field_index(
+        client,
+        collection_name,
+        UUID_PAYLOAD_KEY,
+        FieldType::Uuid,
+        UuidIndexParamsBuilder::default()
+            .is_tenant(true)
+            .on_disk(true),
+    )
+    .await?;
+
+    // mandatory payload field indices
+    create_field_index(
+        client,
+        collection_name,
+        MANDATORY_PAYLOAD_TIMESTAMP_KEY,
+        FieldType::Datetime,
+        DatetimeIndexParamsBuilder::default()
+            .is_principal(true)
+            .on_disk(true),
+    )
+    .await?;
+    create_field_index(
+        client,
+        collection_name,
+        MANDATORY_PAYLOAD_BOOL_KEY,
+        FieldType::Bool,
+        BoolIndexParamsBuilder::default().on_disk(true),
+    )
+    .await?;
     Ok(())
 }
 

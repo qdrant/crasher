@@ -1,10 +1,6 @@
 use anyhow::Result;
 use qdrant_client::Qdrant;
-use qdrant_client::qdrant::{
-    BoolIndexParamsBuilder, DatetimeIndexParamsBuilder, FieldType, FloatIndexParamsBuilder,
-    GeoIndexParamsBuilder, IntegerIndexParamsBuilder, KeywordIndexParamsBuilder,
-    TextIndexParamsBuilder, TokenizerType, UuidIndexParamsBuilder, WriteOrdering,
-};
+use qdrant_client::qdrant::WriteOrdering;
 use rand::Rng;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
@@ -17,17 +13,14 @@ use crate::checker::{
     check_filter_bool_index, check_filter_null_index, check_points_consistency, check_search_result,
 };
 use crate::client::{
-    create_collection, create_collection_snapshot, create_field_index, delete_collection_snapshot,
-    delete_points, get_collection_info, get_exact_points_count, get_telemetry, insert_points_batch,
-    list_collection_snapshots, query_batch_points, restore_collection_snapshot, set_payload,
+    create_collection, create_collection_snapshot, create_payload_indexes, delete_collection,
+    delete_collection_snapshot, delete_points, get_collection_info, get_exact_points_count,
+    get_telemetry, insert_points_batch, list_collection_snapshots, query_batch_points,
+    restore_collection_snapshot, set_payload,
 };
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
-use crate::generators::{
-    BOOL_PAYLOAD_KEY, DATETIME_PAYLOAD_KEY, FLOAT_PAYLOAD_KEY, GEO_PAYLOAD_KEY,
-    INTEGER_PAYLOAD_KEY, KEYWORD_PAYLOAD_KEY, MANDATORY_PAYLOAD_BOOL_KEY,
-    MANDATORY_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY, TestNamedVectors, UUID_PAYLOAD_KEY,
-};
+use crate::generators::TestNamedVectors;
 
 pub struct Workload {
     collection_name: String,
@@ -55,12 +48,13 @@ impl Workload {
         vec_dim: u32,
         rng_seed: u64,
     ) -> Self {
+        let collection_name = collection_name.to_string();
         let payload_count = 5; // hardcoded
         let query_count = 2; //hardcoded
         let test_named_vectors = TestNamedVectors::new(duplication_factor, vec_dim);
         let write_ordering = None; // default
         Self {
-            collection_name: collection_name.to_string(),
+            collection_name,
             test_named_vectors,
             query_count,
             points_count,
@@ -152,214 +146,46 @@ impl Workload {
         rng: &mut impl Rng,
     ) -> Result<(), CrasherError> {
         log::info!("Starting workload...");
-        // create and populate collection if it does not exist
-        if !client.collection_exists(&self.collection_name).await? {
+        if client.collection_exists(&self.collection_name).await? {
+            // Validate and clean up existing data
+            let current_count = get_exact_points_count(client, &self.collection_name).await?;
+            let confirmed_point_count = match self.get_max_confirmed_point_id() {
+                None => 0,
+                Some(point_id) => point_id + 1,
+            };
+            let checkable_points =
+                std::cmp::min(current_count as u64, confirmed_point_count) as usize;
+            if checkable_points != 0 {
+                log::info!(
+                    "Run: previous data consistency check ({confirmed_point_count} / {current_count} points)"
+                );
+                self.check_data_consistency(client, checkable_points, "post-crash-check")
+                    .await?;
+            }
+
+            // Always delete all points before checking snapshots
+            log::info!("Run: delete all existing points");
+            delete_points(client, &self.collection_name).await?;
             self.reset_max_confirmed_point_id();
 
-            log::info!("Creating workload collection");
-            create_collection(
-                client,
-                &self.collection_name,
-                &self.test_named_vectors,
-                args.clone(),
-            )
-            .await?;
+            // Validate existing collection snapshots
+            self.validate_snapshots(client, http_client, &args).await?;
 
-            // create keyword index for the payload
-            create_field_index(
-                client,
-                &self.collection_name,
-                KEYWORD_PAYLOAD_KEY,
-                FieldType::Keyword,
-                KeywordIndexParamsBuilder::default()
-                    .is_tenant(true)
-                    .on_disk(true),
-            )
-            .await?;
-
-            // create integer index for the payload
-            create_field_index(
-                client,
-                &self.collection_name,
-                INTEGER_PAYLOAD_KEY,
-                FieldType::Integer,
-                IntegerIndexParamsBuilder::new(true, true)
-                    .is_principal(true)
-                    .on_disk(true),
-            )
-            .await?;
-
-            // create float index for the payload
-            create_field_index(
-                client,
-                &self.collection_name,
-                FLOAT_PAYLOAD_KEY,
-                FieldType::Float,
-                FloatIndexParamsBuilder::default()
-                    .is_principal(true)
-                    .on_disk(true),
-            )
-            .await?;
-
-            // create geo index for the payload
-            create_field_index(
-                client,
-                &self.collection_name,
-                GEO_PAYLOAD_KEY,
-                FieldType::Geo,
-                GeoIndexParamsBuilder::default().on_disk(true),
-            )
-            .await?;
-
-            // create text payload index
-            create_field_index(
-                client,
-                &self.collection_name,
-                TEXT_PAYLOAD_KEY,
-                FieldType::Text,
-                TextIndexParamsBuilder::new(TokenizerType::Multilingual)
-                    .ascii_folding(true)
-                    .snowball_stemmer("english".to_string())
-                    .stopwords_language("english".to_string())
-                    .phrase_matching(true)
-                    .on_disk(true),
-            )
-            .await?;
-
-            // create boolean index for the payload
-            create_field_index(
-                client,
-                &self.collection_name,
-                BOOL_PAYLOAD_KEY,
-                FieldType::Bool,
-                BoolIndexParamsBuilder::new().on_disk(true),
-            )
-            .await?;
-
-            // create timestamp index for payload
-            create_field_index(
-                client,
-                &self.collection_name,
-                DATETIME_PAYLOAD_KEY,
-                FieldType::Datetime,
-                DatetimeIndexParamsBuilder::default()
-                    .is_principal(true)
-                    .on_disk(true),
-            )
-            .await?;
-
-            // create UUID index for the payload
-            create_field_index(
-                client,
-                &self.collection_name,
-                UUID_PAYLOAD_KEY,
-                FieldType::Uuid,
-                UuidIndexParamsBuilder::default()
-                    .is_tenant(true)
-                    .on_disk(true),
-            )
-            .await?;
-
-            // mandatory payload field indices
-            create_field_index(
-                client,
-                &self.collection_name,
-                MANDATORY_PAYLOAD_TIMESTAMP_KEY,
-                FieldType::Datetime,
-                DatetimeIndexParamsBuilder::default()
-                    .is_principal(true)
-                    .on_disk(true),
-            )
-            .await?;
-            create_field_index(
-                client,
-                &self.collection_name,
-                MANDATORY_PAYLOAD_BOOL_KEY,
-                FieldType::Bool,
-                BoolIndexParamsBuilder::default().on_disk(true),
-            )
-            .await?;
-
-            let collection_info = get_collection_info(client, &self.collection_name).await?;
-            log::info!("Collection info: {collection_info:#?}");
+            // Delete collection to not accumulate hidden state
+            delete_collection(client, &self.collection_name).await?;
         }
 
-        // Validate and clean up existing data
-        let current_count = get_exact_points_count(client, &self.collection_name).await?;
-        let confirmed_point_count = match self.get_max_confirmed_point_id() {
-            None => 0,
-            Some(point_id) => point_id + 1,
-        };
-        let checkable_points = std::cmp::min(current_count as u64, confirmed_point_count) as usize;
-        if checkable_points != 0 {
-            log::info!(
-                "Run: previous data consistency check ({confirmed_point_count} / {current_count} points)"
-            );
-            self.data_consistency_check(client, checkable_points, "post-crash-check")
-                .await?;
-        }
-
-        // Always delete all points
-        log::info!("Run: delete all existing points");
-        delete_points(client, &self.collection_name).await?;
+        log::info!("Creating workload collection");
         self.reset_max_confirmed_point_id();
-
-        // Validate existing collection snapshots
-        let snapshots = list_collection_snapshots(client, &self.collection_name).await?;
-        if !snapshots.is_empty() {
-            log::info!("Found {} local collection snapshots", snapshots.len());
-            // Do not crash during restore as it would leave a dummy shard behind & make sure we delete snapshots
-            let _crash_lock_guard = self.crash_lock.lock().await;
-            for snapshot in &snapshots {
-                let snapshot_name = &snapshot.name;
-                // Make sure everything was deleted before the snapshot restore
-                let after_delete_count =
-                    get_exact_points_count(client, &self.collection_name).await?;
-                if after_delete_count != 0 {
-                    return Err(Invariant(format!(
-                        "Expected zero points before restoring snapshot but got {after_delete_count}"
-                    )));
-                }
-
-                if args.skip_snapshot_restore {
-                    log::info!("Run: skipping restoring snapshot '{snapshot_name}'");
-                    delete_collection_snapshot(client, &self.collection_name, snapshot_name)
-                        .await?;
-                    continue;
-                }
-
-                log::info!("Run: restoring snapshot '{snapshot_name}'");
-                restore_collection_snapshot(
-                    &self.collection_name,
-                    snapshot_name,
-                    snapshot.checksum(),
-                    http_client,
-                )
-                .await?;
-
-                let restored_count = get_exact_points_count(client, &self.collection_name).await?;
-
-                if restored_count == 0 {
-                    log::info!("Snapshot `{snapshot_name}` does not contain any points");
-                    continue;
-                }
-
-                log::info!(
-                    "Run: data consistency check over {restored_count} points restored for snapshot '{snapshot_name}'"
-                );
-                self.data_consistency_check(
-                    client,
-                    restored_count,
-                    &format!("snapshot-restore-check-{snapshot_name}"),
-                )
-                .await?;
-                // cleanup
-                delete_collection_snapshot(client, &self.collection_name, snapshot_name).await?;
-                delete_points(client, &self.collection_name).await?;
-                self.reset_max_confirmed_point_id();
-            }
-            log::info!("All snapshots validated and deleted!");
-        }
+        create_collection(
+            client,
+            &self.collection_name,
+            &self.test_named_vectors,
+            args.clone(),
+        )
+        .await?;
+        create_payload_indexes(client, &self.collection_name).await?;
+        let _collection_info = get_collection_info(client, &self.collection_name).await?;
 
         log::info!("Run: insert points");
         insert_points_batch(
@@ -381,7 +207,7 @@ impl Workload {
         // All written points should be confirmed here, as insert_points_batch waits for completion
         let points_count = get_exact_points_count(client, &self.collection_name).await?;
         log::info!("Run: post-point-insert data consistency check");
-        self.data_consistency_check(client, points_count, "post-insert-check")
+        self.check_data_consistency(client, points_count, "post-insert-check")
             .await?;
 
         // Starts snapshotting process as the data was ingested properly
@@ -410,7 +236,7 @@ impl Workload {
 
         // Set-payload should not remove any points, so count should remain the same
         log::info!("Run: post-payload-insert data consistency check");
-        self.data_consistency_check(client, points_count, "post-set-payload-check")
+        self.check_data_consistency(client, points_count, "post-set-payload-check")
             .await?;
 
         log::info!("Run: query random vectors");
@@ -451,7 +277,7 @@ impl Workload {
     /// - all point ids exist
     /// - all named vectors exist
     /// - all mandatory payload keys exist
-    async fn data_consistency_check(
+    async fn check_data_consistency(
         &self,
         client: &Qdrant,
         current_count: usize,
@@ -508,6 +334,72 @@ impl Workload {
             }
             Ok(())
         })
+    }
+
+    /// Validate exiting snapshots by sequentially restoring and checking data consistency
+    async fn validate_snapshots(
+        &self,
+        client: &Qdrant,
+        http_client: &reqwest::Client,
+        args: &Args,
+    ) -> Result<(), CrasherError> {
+        let snapshots = list_collection_snapshots(client, &self.collection_name).await?;
+        if snapshots.is_empty() {
+            return Ok(());
+        }
+
+        log::info!("Found {} local collection snapshots", snapshots.len());
+        // Do not crash during restore as it would leave a dummy shard behind & make sure we delete snapshots
+        let _crash_lock_guard = self.crash_lock.lock().await;
+        for snapshot in &snapshots {
+            let snapshot_name = &snapshot.name;
+            // Make sure everything was deleted before the snapshot restore
+            let after_delete_count = get_exact_points_count(client, &self.collection_name).await?;
+            if after_delete_count != 0 {
+                return Err(Invariant(format!(
+                    "Expected zero points before restoring snapshot but got {after_delete_count}"
+                )));
+            }
+
+            if args.skip_snapshot_restore {
+                log::info!("Run: skipping restoring snapshot '{snapshot_name}'");
+                delete_collection_snapshot(client, &self.collection_name, snapshot_name).await?;
+                continue;
+            }
+
+            log::info!("Run: restoring snapshot '{snapshot_name}'");
+            restore_collection_snapshot(
+                &self.collection_name,
+                snapshot_name,
+                snapshot.checksum(),
+                http_client,
+            )
+            .await?;
+
+            let restored_count = get_exact_points_count(client, &self.collection_name).await?;
+
+            if restored_count == 0 {
+                log::info!("Snapshot `{snapshot_name}` does not contain any points");
+                continue;
+            }
+
+            log::info!(
+                "Run: data consistency check over {restored_count} points restored for snapshot '{snapshot_name}'"
+            );
+            self.check_data_consistency(
+                client,
+                restored_count,
+                &format!("snapshot-restore-check-{snapshot_name}"),
+            )
+            .await?;
+            // cleanup
+            delete_collection_snapshot(client, &self.collection_name, snapshot_name).await?;
+            delete_points(client, &self.collection_name).await?;
+            self.reset_max_confirmed_point_id();
+        }
+        log::info!("All snapshots validated and deleted!");
+
+        Ok(())
     }
 }
 
