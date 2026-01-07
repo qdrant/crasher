@@ -14,10 +14,6 @@ on:
       crashing_time:
         description: "Duration in seconds, default is 3600s (1h)"
         default: 3600
-      backup_storage_dir:
-        description: "Backup storage dir before each Qdrant restart"
-        type: boolean
-        default: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -89,7 +85,7 @@ jobs:
           cp -r qdrant-src/config qdrant
 
           crashing_time="${{ steps.default_inputs.outputs.crashing_time }}"
-          backup_storage_dir="${{ inputs.backup_storage_dir && format('{0}/qdrant/storage-backup', github.workspace) || '' }}"
+          backup_storage_dir="${{ format('{0}/qdrant/storage-backup', github.workspace) }}"
 
           ./crash-things.sh qdrant ../qdrant-src/target/debug/qdrant 0.3 "$crashing_time" "$backup_storage_dir"
       - name: Upload logs on failure
