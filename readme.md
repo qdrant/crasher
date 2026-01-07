@@ -46,7 +46,7 @@ Options:
       --memmap-threshold <MEMMAP_THRESHOLD>
           Maximum size (in `KiloBytes`) of vectors to store in-memory per segment
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
-          Timeout of gRPC client [default: 20000]
+          Timeout of gRPC client [default: 60000]
       --http-timeout-ms <HTTP_TIMEOUT_MS>
           Timeout of HTTP client [default: 60000]
       --on-disk-payload
