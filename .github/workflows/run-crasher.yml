@@ -40,7 +40,7 @@ jobs:
 
           crash_probability="${{ inputs.crash_probability }}"
           if [ -z "$crash_probability" ]; then
-            crashing_time=0.3
+            crash_probability=0.3
           fi
 
           echo "qdrant_version=$qdrant_version" >> $GITHUB_OUTPUT
