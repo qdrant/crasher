@@ -17,7 +17,7 @@ on:
       backup_working_dir:
         description: "Backup working dir before each Qdrant restart"
         type: boolean
-        default: false
+        default: true
 
 env:
   CARGO_TERM_COLOR: always
