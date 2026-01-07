@@ -187,7 +187,10 @@ impl Workload {
         )
         .await?;
         create_payload_indexes(client, &self.collection_name).await?;
-        let _collection_info = get_collection_info(client, &self.collection_name).await?;
+        let _collection_info = get_collection_info(client, &self.collection_name).await?; // debug
+
+        // Enable crashing to happen starting from here
+        drop(crash_guard);
 
         log::info!("Run: insert points");
         insert_points_batch(
@@ -215,9 +218,6 @@ impl Workload {
         // Starts snapshotting process as the data was ingested properly
         log::info!("Run: trigger collection snapshot in the background");
         let snapshotting_handle = self.trigger_continuous_snapshotting(client);
-
-        // Enable crashing to happen starting from here
-        drop(crash_guard);
 
         log::info!("Run: set payload");
         for point_id in 1..self.points_count {
