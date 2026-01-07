@@ -329,8 +329,13 @@ impl Workload {
                 }
 
                 log::info!("Run: restoring snapshot '{snapshot_name}'");
-                restore_collection_snapshot(&self.collection_name, snapshot_name, http_client)
-                    .await?;
+                restore_collection_snapshot(
+                    &self.collection_name,
+                    snapshot_name,
+                    snapshot.checksum(),
+                    http_client,
+                )
+                .await?;
 
                 let restored_count = get_exact_points_count(client, &self.collection_name).await?;
 

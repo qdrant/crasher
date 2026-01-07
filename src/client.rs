@@ -532,6 +532,7 @@ const HTTP_PORT: u32 = 6333;
 pub async fn restore_collection_snapshot(
     collection_name: &str,
     snapshot_name: &str,
+    checksum: &str,
     client: &reqwest::Client,
 ) -> Result<(), CrasherError> {
     let url =
@@ -542,7 +543,8 @@ pub async fn restore_collection_snapshot(
         "location": format!(
             "http://localhost:{HTTP_PORT}/collections/{collection_name}/snapshots/{snapshot_name}"
         ),
-        "priority": "snapshot"
+        "priority": "snapshot",
+        "checksum": checksum
     });
 
     let response = client.put(&url).json(&body).send().await?;
