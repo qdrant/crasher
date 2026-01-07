@@ -48,7 +48,7 @@ jobs:
 
           points_count="${{ inputs.points_count }}"
           if [ -z "$points_count" ]; then
-            points_count=500
+            points_count=5000
           fi
 
           echo "qdrant_version=$qdrant_version" >> $GITHUB_OUTPUT

@@ -146,6 +146,8 @@ impl Workload {
         rng: &mut impl Rng,
     ) -> Result<(), CrasherError> {
         log::info!("Starting workload...");
+        // Do not crash during setup and validation phase
+        let crash_guard = self.crash_lock.lock().await;
         if client.collection_exists(&self.collection_name).await? {
             // Validate and clean up existing data
             let current_count = get_exact_points_count(client, &self.collection_name).await?;
@@ -213,6 +215,9 @@ impl Workload {
         // Starts snapshotting process as the data was ingested properly
         log::info!("Run: trigger collection snapshot in the background");
         let snapshotting_handle = self.trigger_continuous_snapshotting(client);
+
+        // Enable crashing to happen starting from here
+        drop(crash_guard);
 
         log::info!("Run: set payload");
         for point_id in 1..self.points_count {
@@ -349,8 +354,6 @@ impl Workload {
         }
 
         log::info!("Found {} local collection snapshots", snapshots.len());
-        // Do not crash during restore as it would leave a dummy shard behind & make sure we delete snapshots
-        let _crash_lock_guard = self.crash_lock.lock().await;
         for snapshot in &snapshots {
             let snapshot_name = &snapshot.name;
             // Make sure everything was deleted before the snapshot restore
