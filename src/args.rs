@@ -7,9 +7,9 @@ pub struct Args {
     /// Working directory for Qdrant data
     #[arg(long)]
     pub working_dir: String,
-    /// Backup working directory between Qdrant restarts (useful to debug storage recovery issues)
+    /// Backup `storage` directory from `working_dir` between Qdrant restarts (useful to debug storage recovery issues)
     #[arg(long)]
-    pub backup_working_dir: Vec<String>,
+    pub storage_backup: Option<String>,
     /// Path to executable binary relative to `working_dir`
     #[arg(long)]
     pub exec_path: String,

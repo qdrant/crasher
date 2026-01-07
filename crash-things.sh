@@ -6,7 +6,7 @@ QDRANT_DIR=${1:-./qdrant/}
 QDRANT_EXEC=${2:-target/debug/qdrant}
 CRASH_PROBABILITY=${3:-0.3}
 RUN_TIME=${4:-300}
-QDRANT_BACKUP_DIRS=( "${@:5}" )
+QDRANT_BACKUP_DIR=${5:?backup directory is required}
 
 CRASHER_LOG=crasher.log
 QDRANT_LOG=../qdrant.log
@@ -15,7 +15,7 @@ CRASHER_CMD=(
     cargo run --release
     --
     --working-dir "$QDRANT_DIR"
-    ${QDRANT_BACKUP_DIRS[@]/#/--backup-working-dir } # this does not handle spaces 😬
+    --storage-backup $QDRANT_BACKUP_DIR
     --exec-path "$QDRANT_EXEC"
     --crash-probability "$CRASH_PROBABILITY"
 )

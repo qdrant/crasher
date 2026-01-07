@@ -4,8 +4,8 @@ use crate::util;
 use anyhow::Context as _;
 use qdrant_client::Qdrant;
 use rand::Rng;
-use std::collections::VecDeque;
 use std::io;
+use std::path::PathBuf;
 use std::process::exit;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -50,7 +50,7 @@ pub fn start_process(
 pub struct ProcessManager {
     pub working_dir: String,
     pub binary_path: String,
-    pub backup_dirs: VecDeque<String>,
+    pub backup_dir: Option<String>,
     pub child_process: Child,
     pub kill_on_drop: bool,
     pub cpu_quota: Option<u32>,
@@ -58,13 +58,16 @@ pub struct ProcessManager {
 
 impl ProcessManager {
     pub fn from_args(args: &Args) -> io::Result<Self> {
-        let manager = Self::new(
+        let mut manager = Self::new(
             &args.working_dir,
             &args.exec_path,
             args.shutdown_on_error,
             args.cpu_quota,
-        )?
-        .with_backup_dirs(args.backup_working_dir.clone());
+        )?;
+
+        if let Some(storage_backup) = &args.storage_backup {
+            manager = manager.with_backup_dirs(storage_backup);
+        }
 
         Ok(manager)
     }
@@ -80,15 +83,15 @@ impl ProcessManager {
         Ok(Self {
             working_dir: working_dir.to_string(),
             binary_path: binary_path.to_string(),
-            backup_dirs: VecDeque::new(),
+            backup_dir: None,
             child_process: child,
             kill_on_drop,
             cpu_quota,
         })
     }
 
-    pub fn with_backup_dirs(mut self, backup_dirs: impl Into<VecDeque<String>>) -> Self {
-        self.backup_dirs = backup_dirs.into();
+    pub fn with_backup_dirs(mut self, backup_dir: impl Into<String>) -> Self {
+        self.backup_dir = Some(backup_dir.into());
         self
     }
 
@@ -97,25 +100,27 @@ impl ProcessManager {
         self.child_process.kill().await.unwrap();
     }
 
-    pub async fn backup_working_dir(&mut self) -> anyhow::Result<()> {
-        let Some(backup_dir) = self.backup_dirs.front() else {
+    pub async fn backup_storage_dir(&mut self) -> anyhow::Result<()> {
+        let Some(backup_dir) = &self.backup_dir else {
             return Ok(());
         };
 
         let backup_exists = fs::try_exists(backup_dir).await.with_context(|| {
-            format!("failed to query if backup working dir {backup_dir} exists")
+            format!("failed to query if backup storage dir {backup_dir} exists")
         })?;
 
+        let backup_dir = PathBuf::from(backup_dir);
+        let backup_dir_path = backup_dir.as_path();
+
+        let source_storage_dir = PathBuf::from(&self.working_dir).join("storage");
+
         if backup_exists {
-            fs::remove_dir_all(backup_dir)
+            fs::remove_dir_all(backup_dir_path)
                 .await
-                .with_context(|| format!("failed to remove backup working dir {backup_dir}"))?;
+                .with_context(|| format!("failed to remove backup storage dir {backup_dir_path:?}"))?;
         }
 
-        util::copy_dir(&self.working_dir, backup_dir).await?;
-
-        let backup_dir = self.backup_dirs.pop_front().expect("backup dir");
-        self.backup_dirs.push_back(backup_dir);
+        util::copy_dir(&source_storage_dir, backup_dir_path).await?;
 
         Ok(())
     }
@@ -141,13 +146,7 @@ impl ProcessManager {
                 log::info!("** Restarting qdrant **");
                 self.kill_process().await;
 
-                if let Err(err) = self.backup_working_dir().await {
-                    log::error!(
-                        "Failed to backup working dir {} to {}: {err:?}",
-                        self.working_dir,
-                        self.backup_dirs.front().expect("backup dir"),
-                    );
-                }
+                self.backup_storage_dir().await.unwrap();
 
                 self.child_process = start_process(
                     &self.working_dir,

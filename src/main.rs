@@ -77,7 +77,7 @@ async fn main() {
                     let (rng_seed, mut workload_rng, mut chaos_rng) = create_rngs(args.rng_seed);
 
                     // workload task
-                    let workload = Workload::new(
+                    let workload: Workload = Workload::new(
                         collection_name,
                         stopped.clone(),
                         crash_lock.clone(),
