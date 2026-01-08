@@ -100,7 +100,7 @@ impl ProcessManager {
         self.child_process.kill().await.unwrap();
     }
 
-    pub async fn backup_storage_dir(&mut self) -> anyhow::Result<()> {
+    pub async fn backup_storage_dir(&self) -> anyhow::Result<()> {
         let Some(backup_dir) = &self.backup_dir else {
             return Ok(());
         };
