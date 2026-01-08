@@ -217,7 +217,11 @@ impl Workload {
 
         // Starts snapshotting process as the data was ingested properly
         log::info!("Run: trigger collection snapshot in the background");
-        let snapshotting_handle = self.trigger_continuous_snapshotting(client);
+
+        // Graceful shutdown of the snapshotting task
+        let is_run_finished = Arc::new(AtomicBool::new(false));
+        let finish = is_run_finished.clone();
+        let snapshotting_handle = self.trigger_continuous_snapshotting(client, finish);
 
         log::info!("Run: set payload");
         for point_id in 1..self.points_count {
@@ -268,7 +272,7 @@ impl Workload {
         let _telemetry = get_telemetry(http_client).await?;
 
         // Stop ongoing snapshotting task
-        snapshotting_handle.abort();
+        is_run_finished.store(true, Ordering::Relaxed);
         match snapshotting_handle.await {
             Ok(Ok(())) => (),
             Err(_join_error) => (), // ignore JoinError
@@ -323,12 +327,13 @@ impl Workload {
     fn trigger_continuous_snapshotting(
         &self,
         client: &Qdrant,
+        finish: Arc<AtomicBool>,
     ) -> JoinHandle<Result<(), CrasherError>> {
         let collection_name = self.collection_name.clone();
         let client_snapshot = client.clone();
         let stopped = self.stopped.clone();
         tokio::spawn(async move {
-            while !stopped.load(Ordering::Relaxed) {
+            while !stopped.load(Ordering::Relaxed) && !finish.load(Ordering::Relaxed) {
                 if let Err(err) =
                     churn_collection_snapshot(&client_snapshot, &collection_name).await
                 {
