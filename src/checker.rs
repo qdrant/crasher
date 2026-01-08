@@ -22,7 +22,7 @@ pub async fn check_points_consistency(
     current_count: usize,
 ) -> Result<(), CrasherError> {
     // fetch all existing points (rely on numeric ids!)
-    let all_ids: Vec<_> = (1..current_count).collect();
+    let all_ids: Vec<_> = (0..current_count).collect();
 
     // track all errors
     let mut missing_points_errors: Vec<usize> = Vec::new();
