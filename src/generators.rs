@@ -8,7 +8,7 @@ use qdrant_client::qdrant::{
     HnswConfigDiff, MultiVectorConfig, ProductQuantization, QuantizationConfig, ScalarQuantization,
     SparseIndexConfig, SparseVectorParams, VectorParams,
 };
-use rand::Rng;
+use rand::{Rng, RngExt};
 use serde_json::json;
 use std::collections::{BTreeMap, HashMap};
 // TODO do not generate vector configuration manually but create all possibility exhaustively

@@ -1,6 +1,6 @@
 use anyhow::Context as _;
 use futures::{FutureExt as _, TryStreamExt as _, future::BoxFuture};
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use rand::{RngExt, SeedableRng, rngs::SmallRng};
 use std::path::PathBuf;
 use tokio::fs;
 

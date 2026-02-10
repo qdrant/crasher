@@ -3,7 +3,7 @@ use crate::client::wait_server_ready;
 use crate::util;
 use anyhow::Context as _;
 use qdrant_client::Qdrant;
-use rand::Rng;
+use rand::{Rng, RngExt};
 use std::io;
 use std::path::PathBuf;
 use std::process::exit;

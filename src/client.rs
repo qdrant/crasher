@@ -25,7 +25,7 @@ use qdrant_client::qdrant::{
     VectorsConfig, WriteOrdering,
 };
 use qdrant_client::qdrant::{Filter, SnapshotDescription};
-use rand::Rng;
+use rand::{Rng, RngExt};
 use serde_json::Value;
 use serde_json::json;
 use std::collections::HashMap;
