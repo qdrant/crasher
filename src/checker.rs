@@ -127,14 +127,14 @@ pub async fn check_points_consistency(
         errors_found.push(format!(
             "detected {} malformed points:\n{:?}",
             malformed_points_errors.len(),
-            malformed_points_errors.join("/n")
+            malformed_points_errors.join("\n")
         ));
     }
 
     if errors_found.is_empty() {
         Ok(())
     } else {
-        let errors_rendered = errors_found.join("/n");
+        let errors_rendered = errors_found.join("\n");
         Err(Invariant(errors_rendered))
     }
 }
