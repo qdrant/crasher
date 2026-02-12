@@ -15,7 +15,6 @@ use crate::crasher_error::CrasherError;
 use crate::generators::{MANDATORY_PAYLOAD_BOOL_KEY, MANDATORY_PAYLOAD_TIMESTAMP_KEY};
 
 /// Vector data consistency checker for id range
-#[allow(deprecated)]
 pub async fn check_points_consistency(
     collection_name: &str,
     client: &Qdrant,
@@ -80,11 +79,6 @@ pub async fn check_points_consistency(
                                     .push(format!("Named vector {point_id:?} should not be empty"));
                             }
                             for (name, vector) in &named_vectors.vectors {
-                                if vector.data.is_empty() {
-                                    malformed_points_errors.push(format!(
-                                        "Vector {name} with id {point_id:?} should not be empty"
-                                    ));
-                                }
                                 if check_zeroed_vector(vector) {
                                     malformed_points_errors.push(format!(
                                         "Vector {name} with id {point_id:?} is zeroed"
@@ -216,7 +210,6 @@ pub async fn check_filter_bool_index(
 }
 
 /// Checks if this is a zeroed vector.
-#[allow(deprecated)]
 pub fn check_zeroed_vector(vector: &VectorOutput) -> bool {
     vector
         .vector
@@ -232,7 +225,7 @@ pub fn check_zeroed_vector(vector: &VectorOutput) -> bool {
                 .all(|v| v.data.iter().all(|v| *v == 0.0)),
         })
         // else, check the deprecated field
-        .unwrap_or_else(|| vector.data.iter().all(|v| *v == 0.0))
+        .unwrap_or_else(|| false)
 }
 
 pub fn check_search_result(results: &QueryBatchResponse) -> Result<(), CrasherError> {
