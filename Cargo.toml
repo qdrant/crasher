@@ -6,11 +6,11 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.101"
+anyhow = "1.0.102"
 thiserror = "2.0.18"
 chrono = "0.4.43"
 rand = "0.10.0"
-clap = { version = "4.5.58", features = ["derive"] }
+clap = { version = "4.5.60", features = ["derive"] }
 futures = { version = "0.3.32", default-features = false, features = [
     "async-await",
     "std",
