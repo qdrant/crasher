@@ -19,7 +19,7 @@ tokio = { version = "1.49.0", features = ["full"] }
 tokio-stream = { version = "0.1.18", default-features = false, features = [
     "fs",
 ] }
-qdrant-client = "=1.16.0"
+qdrant-client = "=1.17.0"
 ctrlc = "3.5.2"
 log = "0.4.29"
 env_logger = "0.11.9"
