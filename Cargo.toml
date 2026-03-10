@@ -8,14 +8,14 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.102"
 thiserror = "2.0.18"
-chrono = "0.4.43"
+chrono = "0.4.44"
 rand = "0.10.0"
 clap = { version = "4.5.60", features = ["derive"] }
 futures = { version = "0.3.32", default-features = false, features = [
     "async-await",
     "std",
 ] }
-tokio = { version = "1.49.0", features = ["full"] }
+tokio = { version = "1.50.0", features = ["full"] }
 tokio-stream = { version = "0.1.18", default-features = false, features = [
     "fs",
 ] }
@@ -24,7 +24,7 @@ ctrlc = "3.5.2"
 log = "0.4.29"
 env_logger = "0.11.9"
 serde_json = "1.0.149"
-uuid = { version = "1.21.0", features = ["v4", "serde"] }
+uuid = { version = "1.22.0", features = ["v4", "serde"] }
 tonic = "0.12.3"
 reqwest = { version = "0.13.2", features = ["json"] } # for snapshot restore
 ahash = "0.8.12"
