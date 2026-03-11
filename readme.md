@@ -45,6 +45,8 @@ Options:
           Optimizer indexing threshold
       --memmap-threshold <MEMMAP_THRESHOLD>
           Maximum size (in `KiloBytes`) of vectors to store in-memory per segment
+      --prevent-unindexed
+          Whether to prevent the creation of large unindexed segments
       --grpc-timeout-ms <GRPC_TIMEOUT_MS>
           Timeout of gRPC client [default: 60000]
       --http-timeout-ms <HTTP_TIMEOUT_MS>

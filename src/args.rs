@@ -49,6 +49,9 @@ pub struct Args {
     /// Maximum size (in `KiloBytes`) of vectors to store in-memory per segment.
     #[arg(long)]
     pub memmap_threshold: Option<u32>,
+    /// Whether to prevent the creation of large unindexed segments
+    #[arg(long, default_value_t = false)]
+    pub prevent_unindexed: bool,
     /// Timeout of gRPC client
     #[arg(long, default_value_t = 60_000)]
     pub grpc_timeout_ms: u64,
