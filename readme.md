@@ -71,6 +71,66 @@ Options:
           Print version
 ```
 
+## Vector configurations
+
+Each base configuration is multiplied by the `--duplication-factor` (default: 2).
+
+### Dense vectors
+
+| Name | Distance | Storage | Datatype | Quantization | HNSW |
+|------|----------|---------|----------|--------------|------|
+| `dense-vector-mmap` | Dot | mmap | - | - | default |
+| `dense-vector-memory` | Dot | memory | - | - | default |
+| `dense-vector-uint8` | Dot | mmap | UInt8 | - | default |
+| `dense-vector-float16` | Dot | mmap | Float16 | - | default |
+| `dense-vector-sq` | Dot | mmap | - | SQ Int8 | default |
+| `dense-vector-pq` | Dot | mmap | - | PQ x8 | default |
+| `dense-vector-bq-1b` | Dot | mmap | - | BQ 1-bit | default |
+| `dense-vector-bq-1Hb` | Dot | mmap | - | BQ 1.5-bit | default |
+| `dense-vector-bq-2b` | Dot | mmap | - | BQ 2-bit | default |
+| `dense-vector-hnsw-inline` | Dot | mmap | - | BQ 2-bit | inline storage |
+| `dense-vector-cosine` | Cosine | mmap | - | - | default |
+| `dense-vector-euclid` | Euclid | mmap | - | - | default |
+| `dense-vector-manhattan` | Manhattan | mmap | - | - | default |
+| `dense-vector-memory-sq` | Dot | memory | - | SQ Int8 | default |
+| `dense-vector-memory-pq` | Dot | memory | - | PQ x8 | default |
+| `dense-vector-memory-bq` | Dot | memory | - | BQ 1-bit | default |
+| `dense-vector-memory-bq-1Hb` | Dot | memory | - | BQ 1.5-bit | default |
+| `dense-vector-memory-bq-2b` | Dot | memory | - | BQ 2-bit | default |
+| `dense-vector-memory-uint8` | Dot | memory | UInt8 | - | default |
+| `dense-vector-memory-float16` | Dot | memory | Float16 | - | default |
+| `dense-vector-memory-cosine` | Cosine | memory | - | - | default |
+| `dense-vector-memory-euclid` | Euclid | memory | - | - | default |
+| `dense-vector-memory-manhattan` | Manhattan | memory | - | - | default |
+| `dense-vector-hnsw-on-disk` | Dot | mmap | - | - | on-disk graph |
+| `dense-vector-pq-x16` | Dot | mmap | - | PQ x16 | default |
+| `dense-vector-sq-ram` | Dot | mmap | - | SQ Int8 (quantile=0.95, always_ram) | default |
+
+### Sparse vectors
+
+| Name | Storage | Datatype | Modifier |
+|------|---------|----------|----------|
+| `sparse-vector-index-disk` | mmap | - | - |
+| `sparse-vector-index-memory` | memory | - | - |
+| `sparse-vector-uint8` | mmap | UInt8 | - |
+| `sparse-vector-float16` | mmap | Float16 | - |
+| `sparse-vector-IDF` | mmap | Float32 | IDF |
+| `sparse-vector-memory-uint8` | memory | UInt8 | - |
+| `sparse-vector-memory-float16` | memory | Float16 | - |
+| `sparse-vector-memory-IDF` | memory | Float32 | IDF |
+
+### Multi-dense vectors
+
+| Name | Distance | Storage | Datatype | Quantization |
+|------|----------|---------|----------|--------------|
+| `multi-dense-vector-mmap` | Dot | mmap | - | - |
+| `multi-dense-vector-memory` | Dot | memory | - | - |
+| `multi-dense-vector-uint8` | Dot | mmap | UInt8 | - |
+| `multi-dense-vector-float16` | Dot | mmap | Float16 | - |
+| `multi-dense-vector-sq` | Dot | mmap | - | SQ Int8 |
+| `multi-dense-vector-pq` | Dot | mmap | - | PQ x8 |
+| `multi-dense-vector-bq` | Dot | mmap | - | BQ 2-bit |
+
 Examples:
 
 - using debug binary:

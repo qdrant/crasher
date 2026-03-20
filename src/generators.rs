@@ -14,8 +14,8 @@ use std::collections::{BTreeMap, HashMap};
 // TODO do not generate vector configuration manually but create all possibility exhaustively
 
 /// Dense vectors base names
-pub const DENSE_VECTOR_NAME_ON_DISK: &str = "dense-vector-on-disk";
-pub const DENSE_VECTOR_NAME_ROCKSDB: &str = "dense-vector-rocksdb";
+pub const DENSE_VECTOR_NAME_MMAP: &str = "dense-vector-mmap";
+pub const DENSE_VECTOR_NAME_MEMORY: &str = "dense-vector-memory";
 pub const DENSE_VECTOR_NAME_UINT8: &str = "dense-vector-uint8";
 pub const DENSE_VECTOR_NAME_FLOAT16: &str = "dense-vector-float16";
 pub const DENSE_VECTOR_NAME_SQ: &str = "dense-vector-sq";
@@ -24,6 +24,22 @@ pub const DENSE_VECTOR_NAME_BQ_1B: &str = "dense-vector-bq-1b";
 pub const DENSE_VECTOR_NAME_BQ_1HB: &str = "dense-vector-bq-1Hb";
 pub const DENSE_VECTOR_NAME_BQ_2B: &str = "dense-vector-bq-2b";
 pub const DENSE_VECTOR_NAME_HNSW_INLINE: &str = "dense-vector-hnsw-inline";
+pub const DENSE_VECTOR_NAME_COSINE: &str = "dense-vector-cosine";
+pub const DENSE_VECTOR_NAME_EUCLID: &str = "dense-vector-euclid";
+pub const DENSE_VECTOR_NAME_MANHATTAN: &str = "dense-vector-manhattan";
+pub const DENSE_VECTOR_NAME_MEMORY_SQ: &str = "dense-vector-memory-sq";
+pub const DENSE_VECTOR_NAME_MEMORY_PQ: &str = "dense-vector-memory-pq";
+pub const DENSE_VECTOR_NAME_MEMORY_BQ: &str = "dense-vector-memory-bq";
+pub const DENSE_VECTOR_NAME_MEMORY_UINT8: &str = "dense-vector-memory-uint8";
+pub const DENSE_VECTOR_NAME_MEMORY_FLOAT16: &str = "dense-vector-memory-float16";
+pub const DENSE_VECTOR_NAME_MEMORY_BQ_1HB: &str = "dense-vector-memory-bq-1Hb";
+pub const DENSE_VECTOR_NAME_MEMORY_BQ_2B: &str = "dense-vector-memory-bq-2b";
+pub const DENSE_VECTOR_NAME_MEMORY_COSINE: &str = "dense-vector-memory-cosine";
+pub const DENSE_VECTOR_NAME_MEMORY_EUCLID: &str = "dense-vector-memory-euclid";
+pub const DENSE_VECTOR_NAME_MEMORY_MANHATTAN: &str = "dense-vector-memory-manhattan";
+pub const DENSE_VECTOR_NAME_HNSW_ON_DISK: &str = "dense-vector-hnsw-on-disk";
+pub const DENSE_VECTOR_NAME_PQ_X16: &str = "dense-vector-pq-x16";
+pub const DENSE_VECTOR_NAME_SQ_RAM: &str = "dense-vector-sq-ram";
 
 /// Sparse vectors base names
 pub const SPARSE_VECTOR_NAME_INDEX_DISK: &str = "sparse-vector-index-disk";
@@ -31,10 +47,13 @@ pub const SPARSE_VECTOR_NAME_INDEX_MEMORY: &str = "sparse-vector-index-memory";
 pub const SPARSE_VECTOR_NAME_UINT8: &str = "sparse-vector-uint8";
 pub const SPARSE_VECTOR_NAME_FLOAT16: &str = "sparse-vector-float16";
 pub const SPARSE_VECTOR_NAME_IDF: &str = "sparse-vector-IDF";
+pub const SPARSE_VECTOR_NAME_MEMORY_UINT8: &str = "sparse-vector-memory-uint8";
+pub const SPARSE_VECTOR_NAME_MEMORY_FLOAT16: &str = "sparse-vector-memory-float16";
+pub const SPARSE_VECTOR_NAME_MEMORY_IDF: &str = "sparse-vector-memory-IDF";
 
 /// Multi vectors base names
-pub const MULTI_VECTOR_NAME_ON_DISK: &str = "multi-dense-vector-on-disk";
-pub const MULTI_VECTOR_NAME_ROCKSDB: &str = "multi-dense-vector-rocksdb";
+pub const MULTI_VECTOR_NAME_MMAP: &str = "multi-dense-vector-mmap";
+pub const MULTI_VECTOR_NAME_MEMORY: &str = "multi-dense-vector-memory";
 pub const MULTI_VECTOR_NAME_UINT8: &str = "multi-dense-vector-uint8";
 pub const MULTI_VECTOR_NAME_FLOAT16: &str = "multi-dense-vector-float16";
 pub const MULTI_VECTOR_NAME_SQ: &str = "multi-dense-vector-sq";
@@ -80,6 +99,16 @@ impl TestNamedVectors {
             inline_storage: None,
         });
 
+        let hnsw_config_on_disk = Some(HnswConfigDiff {
+            m: Some(32),
+            ef_construct: None,
+            full_scan_threshold: None,
+            max_indexing_threads: None,
+            on_disk: Some(true),
+            payload_m: None,
+            inline_storage: None,
+        });
+
         // warning: requires Quantization
         let hnsw_config_inline_storage = Some(HnswConfigDiff {
             m: Some(32),
@@ -91,9 +120,9 @@ impl TestNamedVectors {
             inline_storage: Some(true),
         });
 
-        // dense vectors on disk
+        // dense vectors mmap
         for i in 1..=duplication_factor {
-            let name = format!("{DENSE_VECTOR_NAME_ON_DISK}-{i}");
+            let name = format!("{DENSE_VECTOR_NAME_MMAP}-{i}");
             dense.insert(
                 name,
                 VectorParams {
@@ -101,16 +130,16 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: None,
                     multivector_config: None,
                 },
             );
         }
 
-        // dense vector rocksdb
+        // dense vector memory
         for i in 1..=duplication_factor {
-            let name = format!("{DENSE_VECTOR_NAME_ROCKSDB}-{i}");
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY}-{i}");
             dense.insert(
                 name,
                 VectorParams {
@@ -118,7 +147,7 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(false), // rocksdb
+                    on_disk: Some(false), // memory
                     datatype: None,
                     multivector_config: None,
                 },
@@ -135,7 +164,7 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: Some(2),   // UInt8
                     multivector_config: None,
                 },
@@ -152,7 +181,7 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: Some(3),   // Float16
                     multivector_config: None,
                 },
@@ -175,7 +204,7 @@ impl TestNamedVectors {
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: None,
                     multivector_config: None,
                 },
@@ -197,7 +226,7 @@ impl TestNamedVectors {
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: None,
                     multivector_config: None,
                 },
@@ -220,7 +249,7 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: None,
                     multivector_config: None,
                 },
@@ -243,7 +272,7 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: None,
                     multivector_config: None,
                 },
@@ -266,7 +295,7 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: None,
                     multivector_config: None,
                 },
@@ -289,7 +318,313 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config: hnsw_config_inline_storage,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors cosine distance
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_COSINE}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Cosine.into(),
+                    quantization_config: None,
+                    hnsw_config,
+                    on_disk: Some(true),
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors euclid distance
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_EUCLID}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Euclid.into(),
+                    quantization_config: None,
+                    hnsw_config,
+                    on_disk: Some(true),
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors manhattan distance
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MANHATTAN}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Manhattan.into(),
+                    quantization_config: None,
+                    hnsw_config,
+                    on_disk: Some(true),
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors memory + SQ
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY_SQ}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Scalar(ScalarQuantization {
+                            r#type: 1, // Int8
+                            quantile: None,
+                            always_ram: Some(false),
+                        })),
+                    }),
+                    hnsw_config,
+                    on_disk: Some(false), // memory
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors memory + PQ
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY_PQ}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Product(ProductQuantization {
+                            compression: 1, // x8
+                            always_ram: Some(false),
+                        })),
+                    }),
+                    hnsw_config,
+                    on_disk: Some(false), // memory
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors memory + BQ
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY_BQ}-{i}");
+            let bq_builder =
+                BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::OneBit);
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Binary(bq_builder.build())),
+                    }),
+                    hnsw_config,
+                    on_disk: Some(false), // memory
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors memory + BQ 1.5-bit
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY_BQ_1HB}-{i}");
+            let bq_builder = BinaryQuantizationBuilder::new(false)
+                .encoding(BinaryQuantizationEncoding::OneAndHalfBits);
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Binary(bq_builder.build())),
+                    }),
+                    hnsw_config,
+                    on_disk: Some(false), // memory
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors memory + BQ 2-bit
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY_BQ_2B}-{i}");
+            let bq_builder =
+                BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::TwoBits);
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Binary(bq_builder.build())),
+                    }),
+                    hnsw_config,
+                    on_disk: Some(false), // memory
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors memory + cosine
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY_COSINE}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Cosine.into(),
+                    quantization_config: None,
+                    hnsw_config,
+                    on_disk: Some(false), // memory
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors memory + euclid
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY_EUCLID}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Euclid.into(),
+                    quantization_config: None,
+                    hnsw_config,
+                    on_disk: Some(false), // memory
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors memory + manhattan
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY_MANHATTAN}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Manhattan.into(),
+                    quantization_config: None,
+                    hnsw_config,
+                    on_disk: Some(false), // memory
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors memory + uint8
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY_UINT8}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config,
+                    on_disk: Some(false), // memory
+                    datatype: Some(2),    // UInt8
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors memory + float16
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY_FLOAT16}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config,
+                    on_disk: Some(false), // memory
+                    datatype: Some(3),    // Float16
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors with on-disk HNSW graph
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_HNSW_ON_DISK}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config: hnsw_config_on_disk,
+                    on_disk: Some(true),
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors PQ x16
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_PQ_X16}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Product(ProductQuantization {
+                            compression: 2, // x16
+                            always_ram: Some(false),
+                        })),
+                    }),
+                    hnsw_config,
+                    on_disk: Some(true),
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors SQ with quantile and always_ram
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_SQ_RAM}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Scalar(ScalarQuantization {
+                            r#type: 1, // Int8
+                            quantile: Some(0.95),
+                            always_ram: Some(true),
+                        })),
+                    }),
+                    hnsw_config,
+                    on_disk: Some(true),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -304,7 +639,7 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(true), // on disk
+                        on_disk: Some(true), // mmap
                         datatype: None,
                     }),
                     modifier: None,
@@ -336,7 +671,7 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(true), // on disk
+                        on_disk: Some(true), // mmap
                         datatype: Some(2),   // UInt8
                     }),
                     modifier: None,
@@ -352,7 +687,7 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(true), // on disk
+                        on_disk: Some(true), // mmap
                         datatype: Some(3),   // Float16
                     }),
                     modifier: None,
@@ -368,7 +703,7 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(true), // on disk
+                        on_disk: Some(true), // mmap
                         datatype: Some(1),   // Float32
                     }),
                     modifier: Some(2), // IDF
@@ -376,10 +711,58 @@ impl TestNamedVectors {
             );
         }
 
-        let multivector_config = Some(MultiVectorConfig { comparator: 0 });
-        // multi vector on disk
+        // sparse vector in-memory + uint8
         for i in 1..=duplication_factor {
-            let name = format!("{MULTI_VECTOR_NAME_ON_DISK}-{i}");
+            let name = format!("{SPARSE_VECTOR_NAME_MEMORY_UINT8}-{i}");
+            sparse.insert(
+                name.clone(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // in memory
+                        datatype: Some(2),    // UInt8
+                    }),
+                    modifier: None,
+                },
+            );
+        }
+
+        // sparse vector in-memory + float16
+        for i in 1..=duplication_factor {
+            let name = format!("{SPARSE_VECTOR_NAME_MEMORY_FLOAT16}-{i}");
+            sparse.insert(
+                name.clone(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // in memory
+                        datatype: Some(3),    // Float16
+                    }),
+                    modifier: None,
+                },
+            );
+        }
+
+        // sparse vector in-memory + IDF
+        for i in 1..=duplication_factor {
+            let name = format!("{SPARSE_VECTOR_NAME_MEMORY_IDF}-{i}");
+            sparse.insert(
+                name.clone(),
+                SparseVectorParams {
+                    index: Some(SparseIndexConfig {
+                        full_scan_threshold: None,
+                        on_disk: Some(false), // in memory
+                        datatype: Some(1),    // Float32
+                    }),
+                    modifier: Some(2), // IDF
+                },
+            );
+        }
+
+        let multivector_config = Some(MultiVectorConfig { comparator: 0 });
+        // multi vector mmap
+        for i in 1..=duplication_factor {
+            let name = format!("{MULTI_VECTOR_NAME_MMAP}-{i}");
             multi.insert(
                 name,
                 VectorParams {
@@ -387,16 +770,16 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: None,
                     multivector_config,
                 },
             );
         }
 
-        // multi vector rocksdb
+        // multi vector memory
         for i in 1..=duplication_factor {
-            let name = format!("{MULTI_VECTOR_NAME_ROCKSDB}-{i}");
+            let name = format!("{MULTI_VECTOR_NAME_MEMORY}-{i}");
             multi.insert(
                 name,
                 VectorParams {
@@ -404,7 +787,7 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(false), // rocksdb
+                    on_disk: Some(false), // memory
                     datatype: None,
                     multivector_config,
                 },
@@ -421,7 +804,7 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: Some(2),   // UInt8
                     multivector_config,
                 },
@@ -438,7 +821,7 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: Some(3),   // Float16
                     multivector_config,
                 },
@@ -461,7 +844,7 @@ impl TestNamedVectors {
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: None,
                     multivector_config,
                 },
@@ -483,7 +866,7 @@ impl TestNamedVectors {
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: None,
                     multivector_config,
                 },
@@ -504,7 +887,7 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // on disk
+                    on_disk: Some(true), // mmap
                     datatype: None,
                     multivector_config,
                 },
