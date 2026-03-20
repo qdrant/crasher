@@ -20,6 +20,7 @@ CRASHER_CMD=(
     --exec-path "$QDRANT_EXEC"
     --crash-probability "$CRASH_PROBABILITY"
     --points-count "$POINTS_COUNT"
+    --async-io
 )
 
 echo "${CRASHER_CMD[*]}"

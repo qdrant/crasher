@@ -79,4 +79,7 @@ pub struct Args {
     /// Seed for internal RNG
     #[arg(long)]
     pub rng_seed: Option<u64>,
+    /// Whether to enable io_uring async IO in Qdrant
+    #[arg(long, default_value_t = false)]
+    pub async_io: bool,
 }

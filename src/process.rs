@@ -19,6 +19,7 @@ pub fn start_process(
     exec_path: &str,
     kill_on_drop: bool, // kill child process if parent is dropped
     cpu_quota: Option<u32>,
+    async_io: bool,
 ) -> io::Result<Child> {
     let mut cmd = if let Some(cpu_quota) = cpu_quota {
         let mut c = Command::new("systemd-run");
@@ -32,6 +33,10 @@ pub fn start_process(
     } else {
         Command::new(exec_path)
     };
+
+    if async_io {
+        cmd.env("QDRANT__STORAGE__PERFORMANCE__ASYNC_SCORER", "true");
+    }
 
     cmd.current_dir(working_dir_path)
         .env("QDRANT__CLUSTER__ENABLED", "true")
@@ -54,6 +59,7 @@ pub struct ProcessManager {
     pub child_process: Child,
     pub kill_on_drop: bool,
     pub cpu_quota: Option<u32>,
+    pub async_io: bool,
 }
 
 impl ProcessManager {
@@ -63,6 +69,7 @@ impl ProcessManager {
             &args.exec_path,
             args.shutdown_on_error,
             args.cpu_quota,
+            args.async_io,
         )?;
 
         if let Some(storage_backup) = &args.storage_backup {
@@ -77,8 +84,9 @@ impl ProcessManager {
         binary_path: &str,
         kill_on_drop: bool,
         cpu_quota: Option<u32>,
+        async_io: bool,
     ) -> io::Result<Self> {
-        let child = start_process(working_dir, binary_path, kill_on_drop, cpu_quota)?;
+        let child = start_process(working_dir, binary_path, kill_on_drop, cpu_quota, async_io)?;
 
         Ok(Self {
             working_dir: working_dir.to_string(),
@@ -87,6 +95,7 @@ impl ProcessManager {
             child_process: child,
             kill_on_drop,
             cpu_quota,
+            async_io,
         })
     }
 
@@ -153,6 +162,7 @@ impl ProcessManager {
                     &self.binary_path,
                     self.kill_on_drop,
                     self.cpu_quota,
+                    self.async_io,
                 )
                 .unwrap();
 
