@@ -1,3 +1,4 @@
+use ahash::AHashSet;
 use core::option::Option;
 use core::option::Option::{None, Some};
 use qdrant_client::Payload;
@@ -923,6 +924,15 @@ impl TestNamedVectors {
 
     pub fn multi_names(&self) -> Vec<String> {
         self.multi.keys().cloned().collect()
+    }
+
+    pub fn all_expected_names(&self, only_sparse: bool) -> AHashSet<String> {
+        let mut names: AHashSet<String> = self.sparse.keys().cloned().collect();
+        if !only_sparse {
+            names.extend(self.dense.keys().cloned());
+            names.extend(self.multi.keys().cloned());
+        }
+        names
     }
 }
 

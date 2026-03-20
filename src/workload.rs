@@ -161,8 +161,13 @@ impl Workload {
                 log::info!(
                     "Run: previous data consistency check ({confirmed_point_count} / {current_count} points)"
                 );
-                self.check_data_consistency(client, checkable_points, "post-crash-check")
-                    .await?;
+                self.check_data_consistency(
+                    client,
+                    checkable_points,
+                    args.only_sparse,
+                    "post-crash-check",
+                )
+                .await?;
             }
 
             // Always delete all points before checking snapshots
@@ -212,7 +217,7 @@ impl Workload {
         // All written points should be confirmed here, as insert_points_batch waits for completion
         let points_count = get_exact_points_count(client, &self.collection_name).await?;
         log::info!("Run: post-point-insert data consistency check");
-        self.check_data_consistency(client, points_count, "post-insert-check")
+        self.check_data_consistency(client, points_count, args.only_sparse, "post-insert-check")
             .await?;
 
         // Starts snapshotting process as the data was ingested properly
@@ -245,8 +250,13 @@ impl Workload {
 
         // Set-payload should not remove any points, so count should remain the same
         log::info!("Run: post-payload-insert data consistency check");
-        self.check_data_consistency(client, points_count, "post-set-payload-check")
-            .await?;
+        self.check_data_consistency(
+            client,
+            points_count,
+            args.only_sparse,
+            "post-set-payload-check",
+        )
+        .await?;
 
         log::info!("Run: query random vectors");
         for _i in 0..self.query_count {
@@ -290,12 +300,21 @@ impl Workload {
         &self,
         client: &Qdrant,
         current_count: usize,
+        only_sparse: bool,
         context: &str,
     ) -> Result<(), CrasherError> {
         let mut errors = Vec::new();
 
+        let expected_names = self.test_named_vectors.all_expected_names(only_sparse);
         // check all points and vector present in storage
-        match check_points_consistency(&self.collection_name, client, current_count).await {
+        match check_points_consistency(
+            &self.collection_name,
+            client,
+            current_count,
+            &expected_names,
+        )
+        .await
+        {
             Err(Invariant(e)) => errors.push(format!("*Inconsistent storage*\n{e}")),
             Err(e) => return Err(e),
             Ok(()) => (),
@@ -397,6 +416,7 @@ impl Workload {
             self.check_data_consistency(
                 client,
                 restored_count,
+                args.only_sparse,
                 &format!("snapshot-restore-check-{snapshot_name}"),
             )
             .await?;

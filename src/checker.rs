@@ -19,6 +19,7 @@ pub async fn check_points_consistency(
     collection_name: &str,
     client: &Qdrant,
     current_count: usize,
+    expected_vector_names: &AHashSet<String>,
 ) -> Result<(), CrasherError> {
     // fetch all existing points (rely on numeric ids!)
     let all_ids: Vec<_> = (0..current_count).collect();
@@ -73,10 +74,19 @@ pub async fn check_points_consistency(
                             ));
                         }
                         VectorsOptions::Vectors(named_vectors) => {
-                            // TODO check that all generated named vectors are present
                             if named_vectors.vectors.is_empty() {
                                 malformed_points_errors
                                     .push(format!("Named vector {point_id:?} should not be empty"));
+                            }
+                            // check that all expected named vectors are present
+                            let present_names: AHashSet<&String> =
+                                named_vectors.vectors.keys().collect();
+                            for expected_name in expected_vector_names {
+                                if !present_names.contains(expected_name) {
+                                    malformed_points_errors.push(format!(
+                                        "Point {point_id:?} is missing expected named vector '{expected_name}'"
+                                    ));
+                                }
                             }
                             for (name, vector) in &named_vectors.vectors {
                                 if check_zeroed_vector(vector) {
