@@ -8,11 +8,16 @@ use qdrant_client::Qdrant;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_output::VectorsOptions;
 use qdrant_client::qdrant::{
-    Condition, Filter, QueryBatchResponse, ScrollPointsBuilder, VectorOutput, vector_output,
+    Condition, CountPointsBuilder, Filter, QueryBatchResponse, ScrollPointsBuilder, VectorOutput,
+    vector_output,
 };
 
 use crate::crasher_error::CrasherError;
-use crate::generators::{MANDATORY_PAYLOAD_BOOL_KEY, MANDATORY_PAYLOAD_TIMESTAMP_KEY};
+use crate::generators::{
+    BOOL_PAYLOAD_KEY, DATETIME_PAYLOAD_KEY, FLOAT_PAYLOAD_KEY, GEO_PAYLOAD_KEY,
+    INTEGER_PAYLOAD_KEY, KEYWORD_PAYLOAD_KEY, MANDATORY_PAYLOAD_BOOL_KEY,
+    MANDATORY_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY, UUID_PAYLOAD_KEY,
+};
 
 /// Vector data consistency checker for id range
 pub async fn check_points_consistency(
@@ -219,6 +224,76 @@ pub async fn check_filter_bool_index(
     }
 }
 
+const INDEXED_PAYLOAD_KEYS: &[&str] = &[
+    KEYWORD_PAYLOAD_KEY,
+    INTEGER_PAYLOAD_KEY,
+    FLOAT_PAYLOAD_KEY,
+    GEO_PAYLOAD_KEY,
+    TEXT_PAYLOAD_KEY,
+    BOOL_PAYLOAD_KEY,
+    DATETIME_PAYLOAD_KEY,
+    UUID_PAYLOAD_KEY,
+];
+
+/// Check that all indexed payload fields report the same total count (non_empty + empty).
+/// A divergence between indexes indicates index corruption after a crash.
+pub async fn check_payload_indexes_consistency(
+    collection_name: &str,
+    client: &Qdrant,
+) -> Result<(), CrasherError> {
+    let mut index_totals: Vec<(&str, u64, u64)> = Vec::new();
+
+    for &field_name in INDEXED_PAYLOAD_KEYS {
+        let non_empty_count = client
+            .count(
+                CountPointsBuilder::new(collection_name)
+                    .filter(Filter::must_not([Condition::is_empty(field_name)]))
+                    .exact(true),
+            )
+            .await?
+            .result
+            .unwrap()
+            .count;
+
+        let empty_count = client
+            .count(
+                CountPointsBuilder::new(collection_name)
+                    .filter(Filter::must([Condition::is_empty(field_name)]))
+                    .exact(true),
+            )
+            .await?
+            .result
+            .unwrap()
+            .count;
+
+        index_totals.push((field_name, non_empty_count, empty_count));
+    }
+
+    let totals: Vec<u64> = index_totals
+        .iter()
+        .map(|(_, non_empty, empty)| non_empty + empty)
+        .collect();
+
+    // All indexes should agree on the total
+    if totals.windows(2).all(|w| w[0] == w[1]) {
+        Ok(())
+    } else {
+        let details: Vec<String> = index_totals
+            .iter()
+            .map(|(name, non_empty, empty)| {
+                format!(
+                    "'{name}': non_empty({non_empty}) + empty({empty}) = {}",
+                    non_empty + empty
+                )
+            })
+            .collect();
+        Err(Invariant(format!(
+            "Payload indexes report different totals:\n{}",
+            details.join("\n")
+        )))
+    }
+}
+
 /// Checks if this is a zeroed vector.
 pub fn check_zeroed_vector(vector: &VectorOutput) -> bool {
     vector
@@ -244,12 +319,13 @@ pub async fn check_optimizer_status(
 ) -> Result<(), CrasherError> {
     let info = get_collection_info(client, collection_name).await?;
     if let Some(optimizer_status) = &info.optimizer_status
-        && !optimizer_status.ok {
-            return Err(Invariant(format!(
-                "Optimizer status is red: {}",
-                optimizer_status.error
-            )));
-        }
+        && !optimizer_status.ok
+    {
+        return Err(Invariant(format!(
+            "Optimizer status is red: {}",
+            optimizer_status.error
+        )));
+    }
     Ok(())
 }
 
