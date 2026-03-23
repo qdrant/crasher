@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::client::retrieve_points;
+use crate::client::{get_collection_info, retrieve_points};
 use crate::crasher_error::CrasherError::Invariant;
 use ahash::AHashSet;
 use futures::stream::{self, StreamExt, TryStreamExt};
@@ -236,6 +236,21 @@ pub fn check_zeroed_vector(vector: &VectorOutput) -> bool {
         })
         // else, check the deprecated field
         .unwrap_or_else(|| false)
+}
+
+pub async fn check_optimizer_status(
+    collection_name: &str,
+    client: &Qdrant,
+) -> Result<(), CrasherError> {
+    let info = get_collection_info(client, collection_name).await?;
+    if let Some(optimizer_status) = &info.optimizer_status
+        && !optimizer_status.ok {
+            return Err(Invariant(format!(
+                "Optimizer status is red: {}",
+                optimizer_status.error
+            )));
+        }
+    Ok(())
 }
 
 pub fn check_search_result(results: &QueryBatchResponse) -> Result<(), CrasherError> {

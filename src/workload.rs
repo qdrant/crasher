@@ -10,7 +10,8 @@ use tokio::time::sleep;
 
 use crate::args::Args;
 use crate::checker::{
-    check_filter_bool_index, check_filter_null_index, check_points_consistency, check_search_result,
+    check_filter_bool_index, check_filter_null_index, check_optimizer_status,
+    check_points_consistency, check_search_result,
 };
 use crate::client::{
     create_collection, create_collection_snapshot, create_payload_indexes, delete_collection,
@@ -330,6 +331,13 @@ impl Workload {
         // check mandatory bool payload key via match query
         match check_filter_bool_index(&self.collection_name, client, current_count).await {
             Err(Invariant(e)) => errors.push(format!("*Inconsistent Bool Index*\n{e}")),
+            Err(e) => return Err(e),
+            Ok(()) => (),
+        }
+
+        // check optimizer status is not red
+        match check_optimizer_status(&self.collection_name, client).await {
+            Err(Invariant(e)) => errors.push(format!("*Optimizer status error*\n{e}")),
             Err(e) => return Err(e),
             Ok(()) => (),
         }
