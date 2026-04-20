@@ -108,9 +108,9 @@ jobs:
           backup_storage_dir="${{ format('{0}/qdrant/storage-backup', github.workspace) }}"
 
           ./crash-things.sh qdrant ../qdrant-src/target/debug/qdrant "$crash_probability" "$crashing_time" "$points_count" "$backup_storage_dir"
-      - name: Upload logs on failure
+      - name: Upload logs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: failure() || cancelled()
+        if: always()
         with:
           name: logs
           retention-days: 90 # default max value

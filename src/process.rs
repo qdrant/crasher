@@ -123,36 +123,13 @@ impl ProcessManager {
 
         let source_storage_dir = PathBuf::from(&self.working_dir).join("storage");
 
-        let src_bytes = util::dir_size_bytes(&source_storage_dir).await;
-        let prev_bak_bytes = if backup_exists {
-            util::dir_size_bytes(backup_dir_path).await
-        } else {
-            0
-        };
-        let free_before = util::fs_free_bytes(&source_storage_dir).unwrap_or(0);
-        log::info!(
-            "Backup start: storage={} prev_backup={} fs_free={}",
-            util::format_mb(src_bytes),
-            util::format_mb(prev_bak_bytes),
-            util::format_mb(free_before),
-        );
-
         if backup_exists {
             fs::remove_dir_all(backup_dir_path).await.with_context(|| {
                 format!("failed to remove backup storage dir {backup_dir_path:?}")
             })?;
         }
 
-        let start = std::time::Instant::now();
         util::copy_dir(&source_storage_dir, backup_dir_path).await?;
-
-        let free_after = util::fs_free_bytes(&source_storage_dir).unwrap_or(0);
-        log::info!(
-            "Backup done in {:?}: copied={} fs_free_after={}",
-            start.elapsed(),
-            util::format_mb(src_bytes),
-            util::format_mb(free_after),
-        );
 
         Ok(())
     }
@@ -175,7 +152,18 @@ impl ProcessManager {
                     // give up draw if crashing is not allowed
                     continue;
                 };
-                log::info!("** Restarting qdrant **");
+
+                // Capture storage footprint before the restart event.
+                // Runs on every restart (with or without --storage-backup) so we
+                // get a growth trace even on successful runs.
+                let source = PathBuf::from(&self.working_dir).join("storage");
+                let storage_bytes = util::dir_size_bytes(&source).await;
+                let fs_free = util::fs_free_bytes(&source).unwrap_or(0);
+                log::info!(
+                    "** Restarting qdrant ** storage={} fs_free={}",
+                    util::format_mb(storage_bytes),
+                    util::format_mb(fs_free),
+                );
                 self.kill_process().await;
 
                 self.backup_storage_dir().await.unwrap();
