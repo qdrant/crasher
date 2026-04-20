@@ -155,15 +155,38 @@ impl ProcessManager {
 
                 // Capture storage footprint before the restart event.
                 // Runs on every restart (with or without --storage-backup) so we
-                // get a growth trace even on successful runs.
+                // get a growth trace even on successful runs. Per-family and
+                // per-shard breakdowns help spot which vector type or shard is
+                // driving any blow-up.
                 let source = PathBuf::from(&self.working_dir).join("storage");
-                let storage_bytes = util::dir_size_bytes(&source).await;
+                let report = util::storage_report(&source).await;
                 let fs_free = util::fs_free_bytes(&source).unwrap_or(0);
+                let bd = &report.total;
                 log::info!(
-                    "** Restarting qdrant ** storage={} fs_free={}",
-                    util::format_mb(storage_bytes),
+                    "** Restarting qdrant ** storage={} (dense={} dense_q={} multi={} multi_q={} sparse={} payload={} other={}) fs_free={}",
+                    util::format_mb(bd.total),
+                    util::format_mb(bd.dense),
+                    util::format_mb(bd.dense_quant),
+                    util::format_mb(bd.multi_dense),
+                    util::format_mb(bd.multi_dense_quant),
+                    util::format_mb(bd.sparse),
+                    util::format_mb(bd.payload),
+                    util::format_mb(bd.other),
                     util::format_mb(fs_free),
                 );
+                for (shard_id, sbd) in &report.per_shard {
+                    log::info!(
+                        "  shard {shard_id}: {} (dense={} dense_q={} multi={} multi_q={} sparse={} payload={} other={})",
+                        util::format_mb(sbd.total),
+                        util::format_mb(sbd.dense),
+                        util::format_mb(sbd.dense_quant),
+                        util::format_mb(sbd.multi_dense),
+                        util::format_mb(sbd.multi_dense_quant),
+                        util::format_mb(sbd.sparse),
+                        util::format_mb(sbd.payload),
+                        util::format_mb(sbd.other),
+                    );
+                }
                 self.kill_process().await;
 
                 self.backup_storage_dir().await.unwrap();

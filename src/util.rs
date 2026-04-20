@@ -9,29 +9,130 @@ pub fn create_rngs(requested_seed: Option<u64>) -> (u64, SmallRng, SmallRng) {
     (s, SmallRng::seed_from_u64(s), SmallRng::seed_from_u64(s))
 }
 
-/// Recursively sum the sizes of all regular files under `path` in bytes.
-/// Errors on individual entries are skipped (best-effort for observability).
-pub async fn dir_size_bytes(path: &Path) -> u64 {
-    let mut stack = vec![path.to_path_buf()];
-    let mut total = 0u64;
-    while let Some(p) = stack.pop() {
-        let mut entries = match fs::read_dir(&p).await {
+/// Per-category size breakdown of a Qdrant `storage/` directory.
+///
+/// Each file is bucketed into exactly one category (buckets are disjoint;
+/// their sum equals `total`):
+/// * `dense`             -- `vector_storage-dense-*` without quantization
+/// * `dense_quant`       -- `vector_storage-dense-*` using bq/pq/sq/tq/hnsw-inline
+/// * `multi_dense`       -- `vector_storage-multi-dense-*` without quantization
+/// * `multi_dense_quant` -- `vector_storage-multi-dense-*` using bq/pq/sq/tq
+/// * `sparse`            -- `vector_storage-sparse-*`
+/// * `payload`           -- `payload_index/` or `payload_storage/` subtrees
+/// * `other`             -- segment metadata, WAL, id_tracker, etc.
+#[derive(Default, Debug, Clone, Copy)]
+pub struct StorageBreakdown {
+    pub total: u64,
+    pub dense: u64,
+    pub dense_quant: u64,
+    pub multi_dense: u64,
+    pub multi_dense_quant: u64,
+    pub sparse: u64,
+    pub payload: u64,
+    pub other: u64,
+}
+
+/// Storage size report: overall totals plus per-shard breakdown.
+/// Shards are detected by their position in the tree
+/// (`storage/collections/<name>/<shard_id>/...`).
+#[derive(Default, Debug)]
+pub struct StorageReport {
+    pub total: StorageBreakdown,
+    pub per_shard: std::collections::BTreeMap<String, StorageBreakdown>,
+}
+
+pub async fn storage_report(root: &Path) -> StorageReport {
+    let mut report = StorageReport::default();
+    // Stack entries: (dir, inherited category tag, inherited shard id)
+    let mut stack: Vec<(PathBuf, &'static str, Option<String>)> =
+        vec![(root.to_path_buf(), "other", None)];
+    while let Some((dir, inherited_tag, shard)) = stack.pop() {
+        let mut entries = match fs::read_dir(&dir).await {
             Ok(e) => e,
             Err(_) => continue,
         };
         while let Ok(Some(entry)) = entries.next_entry().await {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let child_path = entry.path();
             let ft = match entry.file_type().await {
                 Ok(t) => t,
                 Err(_) => continue,
             };
             if ft.is_dir() {
-                stack.push(entry.path());
+                let next_tag = classify(&name, inherited_tag);
+                let next_shard = if shard.is_some() {
+                    shard.clone()
+                } else if is_shard_dir(&child_path) {
+                    Some(name.clone())
+                } else {
+                    None
+                };
+                stack.push((child_path, next_tag, next_shard));
             } else if let Ok(md) = entry.metadata().await {
-                total += md.len();
+                let len = md.len();
+                add_bucket(&mut report.total, inherited_tag, len);
+                if let Some(sid) = &shard {
+                    add_bucket(
+                        report.per_shard.entry(sid.clone()).or_default(),
+                        inherited_tag,
+                        len,
+                    );
+                }
             }
         }
     }
-    total
+    report
+}
+
+fn classify(dir_name: &str, inherited: &'static str) -> &'static str {
+    // Once we're inside a categorized subtree, stay in it.
+    if inherited != "other" {
+        return inherited;
+    }
+    if let Some(rest) = dir_name.strip_prefix("vector_storage-") {
+        // Detect quantized variants by their name tokens. The crasher config
+        // uses `-bq-`, `-pq-`, `-sq-`, `-tq-` as the quantization tag, and
+        // `-hnsw-inline-` which applies BQ under the hood.
+        let quant = rest.contains("-bq-")
+            || rest.contains("-pq-")
+            || rest.contains("-sq-")
+            || rest.contains("-tq-")
+            || rest.contains("-hnsw-inline-");
+        if rest.starts_with("multi-dense-") {
+            return if quant { "multi_dense_quant" } else { "multi_dense" };
+        }
+        if rest.starts_with("sparse-") {
+            return "sparse";
+        }
+        return if quant { "dense_quant" } else { "dense" };
+    }
+    if dir_name == "payload_index" || dir_name == "payload_storage" {
+        return "payload";
+    }
+    "other"
+}
+
+/// A directory is a shard dir if its grandparent is named `collections`,
+/// i.e. the path looks like `.../collections/<collection_name>/<shard_id>`.
+fn is_shard_dir(path: &Path) -> bool {
+    path.parent()
+        .and_then(|p| p.parent())
+        .and_then(|pp| pp.file_name())
+        .map(|n| n == "collections")
+        .unwrap_or(false)
+}
+
+fn add_bucket(bd: &mut StorageBreakdown, tag: &str, len: u64) {
+    bd.total += len;
+    match tag {
+        "dense" => bd.dense += len,
+        "dense_quant" => bd.dense_quant += len,
+        "multi_dense" => bd.multi_dense += len,
+        "multi_dense_quant" => bd.multi_dense_quant += len,
+        "sparse" => bd.sparse += len,
+        "payload" => bd.payload += len,
+        _ => bd.other += len,
+    }
 }
 
 /// Free bytes on the filesystem hosting `path`, via `statvfs`.
