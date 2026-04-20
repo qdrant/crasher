@@ -117,14 +117,16 @@ jobs:
           path: |
             crasher.log
             qdrant.log
+      - name: Archive Qdrant workdir (sparse-aware)
+        if: failure() || cancelled()
+        run: tar --sparse -cf qdrant-workdir.tar qdrant/
       - name: Upload Qdrant workdir on failure
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure() || cancelled()
         with:
           name: qdrant-workdir
           retention-days: 10
-          path: |
-            qdrant/
+          path: qdrant-workdir.tar
       - name: Send Notification
         if: failure() || cancelled()
         uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
