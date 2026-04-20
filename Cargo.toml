@@ -15,7 +15,7 @@ futures = { version = "0.3.32", default-features = false, features = [
     "async-await",
     "std",
 ] }
-tokio = { version = "1.52.0", features = ["full"] }
+tokio = { version = "1.52.1", features = ["full"] }
 tokio-stream = { version = "0.1.18", default-features = false, features = [
     "fs",
 ] }
