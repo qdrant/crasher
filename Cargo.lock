@@ -408,6 +408,7 @@ dependencies = [
  "env_logger",
  "futures",
  "log",
+ "nix",
  "qdrant-client",
  "rand 0.10.1",
  "reqwest 0.13.2",

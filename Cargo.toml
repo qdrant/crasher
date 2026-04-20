@@ -28,6 +28,7 @@ uuid = { version = "1.23.1", features = ["v4", "serde"] }
 tonic = "0.12.3"
 reqwest = { version = "0.13.2", features = ["json"] } # for snapshot restore
 ahash = "0.8.12"
+nix = { version = "0.31", features = ["fs"] }
 
 [profile.release]
 lto = "fat"
