@@ -129,7 +129,13 @@ jobs:
             qdrant.log
       - name: Archive Qdrant workdir (sparse-aware)
         if: failure() || cancelled()
-        run: tar --sparse -cf qdrant-workdir.tar qdrant/
+        run: |
+          if [ -d qdrant/storage-backup ]; then
+            tar --sparse -cf qdrant-workdir.tar qdrant/config qdrant/storage-backup
+          else
+            echo "No storage-backup present (no crash cycle occurred); archiving live storage instead"
+            tar --sparse -cf qdrant-workdir.tar qdrant/config qdrant/storage
+          fi
       - name: Upload Qdrant workdir on failure
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: failure() || cancelled()
