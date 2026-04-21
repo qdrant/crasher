@@ -162,8 +162,9 @@ impl ProcessManager {
                 let report = util::storage_report(&source).await;
                 let fs_free = util::fs_free_bytes(&source).unwrap_or(0);
                 let bd = &report.total;
+                log::info!("** Restarting qdrant **");
                 log::info!(
-                    "** Restarting qdrant ** storage={} (dense={} dense_q={} multi={} multi_q={} sparse={} payload={} other={}) fs_free={}",
+                    "storage={} (dense={} dense_q={} multi={} multi_q={} sparse={} payload={} other={}) fs_free={}",
                     util::format_mb(bd.total),
                     util::format_mb(bd.dense),
                     util::format_mb(bd.dense_quant),

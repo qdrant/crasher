@@ -99,7 +99,11 @@ fn classify(dir_name: &str, inherited: &'static str) -> &'static str {
             || rest.contains("-tq-")
             || rest.contains("-hnsw-inline-");
         if rest.starts_with("multi-dense-") {
-            return if quant { "multi_dense_quant" } else { "multi_dense" };
+            return if quant {
+                "multi_dense_quant"
+            } else {
+                "multi_dense"
+            };
         }
         if rest.starts_with("sparse-") {
             return "sparse";
