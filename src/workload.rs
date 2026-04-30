@@ -307,11 +307,12 @@ impl Workload {
         let mut errors = Vec::new();
 
         let expected_names = self.test_named_vectors.all_expected_names(only_sparse);
-        // check all points and vector present in storage
+        // scroll-based traversal: well-formedness + missing / phantom / UUID / duplicate ids
         match check_points_consistency(
             &self.collection_name,
             client,
             current_count,
+            self.points_count as u64,
             &expected_names,
         )
         .await

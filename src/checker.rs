@@ -1,9 +1,6 @@
-use std::sync::Arc;
-
-use crate::client::{get_collection_info, retrieve_points};
+use crate::client::{get_collection_info, scroll_all_points};
 use crate::crasher_error::CrasherError::Invariant;
-use ahash::AHashSet;
-use futures::stream::{self, StreamExt, TryStreamExt};
+use ahash::{AHashMap, AHashSet};
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_output::VectorsOptions;
@@ -19,132 +16,153 @@ use crate::generators::{
     MANDATORY_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY, UUID_PAYLOAD_KEY,
 };
 
-/// Vector data consistency checker for id range
+/// Scroll-based consistency check over the whole collection.
+///
+/// Iterates every stored point and asserts:
+/// - well-formedness of each point (vectors present, expected named vectors, no zeroed vectors,
+///   mandatory payload keys);
+/// - every id in `[0, expected_present_count)` is present in storage (missing-id check);
+/// - no numeric id is `>= max_id_exclusive` (phantom-id check);
+/// - no UUID-typed id is returned (the workload only inserts numeric ids);
+/// - no id is returned more than once (duplicate check — weak guarantee, since the read
+///   path generally dedupes by id, but cross-shard / replication-recovery edge cases can leak).
 pub async fn check_points_consistency(
     collection_name: &str,
     client: &Qdrant,
-    current_count: usize,
+    expected_present_count: usize,
+    max_id_exclusive: u64,
     expected_vector_names: &AHashSet<String>,
 ) -> Result<(), CrasherError> {
-    // fetch all existing points (rely on numeric ids!)
-    let all_ids: Vec<_> = (0..current_count).collect();
-
-    // track all errors
-    let mut missing_points_errors: Vec<usize> = Vec::new();
+    let mut seen: AHashMap<u64, u32> = AHashMap::default();
+    let mut uuid_ids: Vec<String> = Vec::new();
     let mut malformed_points_errors: Vec<String> = Vec::new();
 
-    // Stream checks by batches to not overload the server
-    let min_batch_size = 1_000;
-    let ids_batch: Vec<Arc<[usize]>> = all_ids
-        .chunks(current_count.min(min_batch_size))
-        .map(Arc::from)
-        .collect();
-    let mut retrieve_points_f = stream::iter(ids_batch)
-        .map(|ids| async {
-            let resp = retrieve_points(client, collection_name, &ids).await?;
-            Ok::<_, CrasherError>((ids, resp))
-        })
-        .buffered(1);
-
-    while let Some((expected_ids, response)) = retrieve_points_f.try_next().await? {
-        // check if missing points
-        if response.result.len() != expected_ids.len() {
-            let response_ids = response
-                .result
-                .iter()
-                .map(|point| point.id.clone().unwrap().point_id_options.unwrap())
-                .map(|id| match id {
-                    PointIdOptions::Num(id) => id as usize,
-                    PointIdOptions::Uuid(_) => panic!("UUID in the response"),
-                })
-                .collect::<AHashSet<_>>();
-
-            let missing_ids = expected_ids
-                .iter()
-                .filter(|&id| !response_ids.contains(id))
-                .copied()
-                .collect::<Vec<_>>();
-            missing_points_errors.extend_from_slice(&missing_ids);
+    scroll_all_points(client, collection_name, true, true, |point| {
+        // Track id occurrences and bucket by type
+        match point.id.as_ref().and_then(|p| p.point_id_options.as_ref()) {
+            Some(PointIdOptions::Num(id)) => {
+                *seen.entry(*id).or_insert(0) += 1;
+            }
+            Some(PointIdOptions::Uuid(s)) => {
+                uuid_ids.push(s.clone());
+            }
+            None => {
+                malformed_points_errors.push("Point with no id field".to_string());
+                return;
+            }
         }
-        // check points are well-formed
-        for point in &response.result {
-            let point_id = point.id.as_ref().expect("Point id should be present");
-            // well-formed vectors
-            if let Some(vectors) = &point.vectors {
-                if let Some(vector) = &vectors.vectors_options {
-                    match vector {
-                        VectorsOptions::Vector(anonymous) => {
-                            malformed_points_errors.push(format!(
-                                "Vector {point_id:?} should be named: {anonymous:?}"
-                            ));
+
+        let point_id = point.id.as_ref().expect("Point id should be present");
+        // well-formed vectors
+        if let Some(vectors) = &point.vectors {
+            if let Some(vector) = &vectors.vectors_options {
+                match vector {
+                    VectorsOptions::Vector(anonymous) => {
+                        malformed_points_errors.push(format!(
+                            "Vector {point_id:?} should be named: {anonymous:?}"
+                        ));
+                    }
+                    VectorsOptions::Vectors(named_vectors) => {
+                        if named_vectors.vectors.is_empty() {
+                            malformed_points_errors
+                                .push(format!("Named vector {point_id:?} should not be empty"));
                         }
-                        VectorsOptions::Vectors(named_vectors) => {
-                            if named_vectors.vectors.is_empty() {
-                                malformed_points_errors
-                                    .push(format!("Named vector {point_id:?} should not be empty"));
+                        let present_names: AHashSet<&String> =
+                            named_vectors.vectors.keys().collect();
+                        for expected_name in expected_vector_names {
+                            if !present_names.contains(expected_name) {
+                                malformed_points_errors.push(format!(
+                                    "Point {point_id:?} is missing expected named vector '{expected_name}'"
+                                ));
                             }
-                            // check that all expected named vectors are present
-                            let present_names: AHashSet<&String> =
-                                named_vectors.vectors.keys().collect();
-                            for expected_name in expected_vector_names {
-                                if !present_names.contains(expected_name) {
-                                    malformed_points_errors.push(format!(
-                                        "Point {point_id:?} is missing expected named vector '{expected_name}'"
-                                    ));
-                                }
-                            }
-                            for (name, vector) in &named_vectors.vectors {
-                                if check_zeroed_vector(vector) {
-                                    malformed_points_errors.push(format!(
-                                        "Vector {name} with id {point_id:?} is zeroed"
-                                    ));
-                                }
+                        }
+                        for (name, vector) in &named_vectors.vectors {
+                            if check_zeroed_vector(vector) {
+                                malformed_points_errors.push(format!(
+                                    "Vector {name} with id {point_id:?} is zeroed"
+                                ));
                             }
                         }
                     }
                 }
-            } else {
-                malformed_points_errors.push(format!(
-                    "Vector {point_id:?} should be present in the response"
-                ));
             }
-            // check mandatory payload keys
-            if !point.payload.contains_key(MANDATORY_PAYLOAD_BOOL_KEY) {
-                malformed_points_errors.push(format!(
-                    "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_BOOL_KEY} in storage"
-                ));
-            }
-            if !point.payload.contains_key(MANDATORY_PAYLOAD_TIMESTAMP_KEY) {
-                malformed_points_errors.push(format!(
-                    "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_TIMESTAMP_KEY} in storage"
-                ));
-            }
+        } else {
+            malformed_points_errors.push(format!(
+                "Vector {point_id:?} should be present in the response"
+            ));
         }
-    }
+        // mandatory payload keys
+        if !point.payload.contains_key(MANDATORY_PAYLOAD_BOOL_KEY) {
+            malformed_points_errors.push(format!(
+                "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_BOOL_KEY} in storage"
+            ));
+        }
+        if !point.payload.contains_key(MANDATORY_PAYLOAD_TIMESTAMP_KEY) {
+            malformed_points_errors.push(format!(
+                "Vector {point_id:?} is missing payload_key:{MANDATORY_PAYLOAD_TIMESTAMP_KEY} in storage"
+            ));
+        }
+    })
+    .await?;
 
-    // merge all violations found
-    let mut errors_found = Vec::new();
-    if !missing_points_errors.is_empty() {
+    // missing ids in [0, expected_present_count)
+    let missing_ids: Vec<u64> = (0..expected_present_count as u64)
+        .filter(|id| !seen.contains_key(id))
+        .collect();
+
+    // duplicate numeric ids (count > 1)
+    let mut duplicates: Vec<(u64, u32)> = seen
+        .iter()
+        .filter(|(_, c)| **c > 1)
+        .map(|(id, c)| (*id, *c))
+        .collect();
+    duplicates.sort_unstable_by_key(|(id, _)| *id);
+
+    // phantom numeric ids (>= max_id_exclusive)
+    let mut phantom_ids: Vec<u64> = seen
+        .keys()
+        .copied()
+        .filter(|id| *id >= max_id_exclusive)
+        .collect();
+    phantom_ids.sort_unstable();
+
+    let mut errors_found: Vec<String> = Vec::new();
+    if !missing_ids.is_empty() {
         errors_found.push(format!(
-            "detected {} missing points:\n{:?}",
-            missing_points_errors.len(),
-            missing_points_errors
+            "detected {} missing points (expected ids [0, {expected_present_count})):\n{missing_ids:?}",
+            missing_ids.len(),
         ));
     }
-
+    if !phantom_ids.is_empty() {
+        errors_found.push(format!(
+            "detected {} phantom point ids (>= {max_id_exclusive}):\n{phantom_ids:?}",
+            phantom_ids.len(),
+        ));
+    }
+    if !uuid_ids.is_empty() {
+        errors_found.push(format!(
+            "detected {} UUID point ids (only numeric ids are inserted):\n{uuid_ids:?}",
+            uuid_ids.len(),
+        ));
+    }
+    if !duplicates.is_empty() {
+        errors_found.push(format!(
+            "detected {} duplicate point ids (id, occurrences):\n{duplicates:?}",
+            duplicates.len(),
+        ));
+    }
     if !malformed_points_errors.is_empty() {
         errors_found.push(format!(
-            "detected {} malformed points:\n{:?}",
+            "detected {} malformed points:\n{}",
             malformed_points_errors.len(),
-            malformed_points_errors.join("\n")
+            malformed_points_errors.join("\n"),
         ));
     }
 
     if errors_found.is_empty() {
         Ok(())
     } else {
-        let errors_rendered = errors_found.join("\n");
-        Err(Invariant(errors_rendered))
+        Err(Invariant(errors_found.join("\n")))
     }
 }
 

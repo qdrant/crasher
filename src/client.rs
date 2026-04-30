@@ -17,12 +17,12 @@ use qdrant_client::qdrant::{
     BoolIndexParamsBuilder, CollectionInfo, CountPointsBuilder, CreateCollectionBuilder,
     CreateFieldIndexCollectionBuilder, CreateSnapshotResponse, DatetimeIndexParamsBuilder,
     DeletePointsBuilder, DeleteSnapshotRequestBuilder, DeleteSnapshotResponse, FieldType,
-    FloatIndexParamsBuilder, GeoIndexParamsBuilder, GetPointsBuilder, GetResponse,
-    IntegerIndexParamsBuilder, KeywordIndexParamsBuilder, OptimizersConfigDiff, PointId,
-    PointStruct, Query, QueryBatchPointsBuilder, QueryBatchResponse, QueryPoints, ReplicaState,
-    SetPayloadPointsBuilder, SparseVectorConfig, TextIndexParamsBuilder, TokenizerType,
-    UpsertPointsBuilder, UuidIndexParamsBuilder, Vector, VectorInput, VectorParamsMap, Vectors,
-    VectorsConfig, WriteOrdering,
+    FloatIndexParamsBuilder, GeoIndexParamsBuilder, IntegerIndexParamsBuilder,
+    KeywordIndexParamsBuilder, OptimizersConfigDiff, PointId, PointStruct, Query,
+    QueryBatchPointsBuilder, QueryBatchResponse, QueryPoints, ReplicaState, RetrievedPoint,
+    ScrollPointsBuilder, SetPayloadPointsBuilder, SparseVectorConfig, TextIndexParamsBuilder,
+    TokenizerType, UpsertPointsBuilder, UuidIndexParamsBuilder, Vector, VectorInput,
+    VectorParamsMap, Vectors, VectorsConfig, WriteOrdering,
 };
 use qdrant_client::qdrant::{Filter, SnapshotDescription};
 use rand::{Rng, RngExt};
@@ -241,6 +241,41 @@ pub async fn query_batch_points(
         .await?;
 
     Ok(response)
+}
+
+/// Scroll the entire collection, invoking `on_point` for every retrieved point.
+///
+/// Pagination is handled internally; memory is bounded by page size, not collection size.
+pub async fn scroll_all_points<F>(
+    client: &Qdrant,
+    collection_name: &str,
+    with_payload: bool,
+    with_vectors: bool,
+    mut on_point: F,
+) -> Result<(), CrasherError>
+where
+    F: FnMut(&RetrievedPoint),
+{
+    let page_size: u32 = 1_000;
+    let mut next_offset: Option<PointId> = None;
+    loop {
+        let mut builder = ScrollPointsBuilder::new(collection_name)
+            .with_payload(with_payload)
+            .with_vectors(with_vectors)
+            .limit(page_size);
+        if let Some(off) = next_offset.take() {
+            builder = builder.offset(off);
+        }
+        let resp = client.scroll(builder).await?;
+        for point in &resp.result {
+            on_point(point);
+        }
+        match resp.next_page_offset {
+            Some(off) => next_offset = Some(off),
+            None => break,
+        }
+    }
+    Ok(())
 }
 
 /// Delete collection
@@ -589,26 +624,6 @@ pub async fn set_payload(
         .await?;
 
     Ok(())
-}
-
-/// Retrieve points with vectors and payload
-pub async fn retrieve_points(
-    client: &Qdrant,
-    collection_name: &str,
-    ids: &[usize],
-) -> Result<GetResponse, CrasherError> {
-    let response = client
-        .get_points(
-            GetPointsBuilder::new(
-                collection_name,
-                ids.iter().map(|id| (*id as u64).into()).collect::<Vec<_>>(),
-            )
-            .with_vectors(true)
-            .with_payload(true),
-        )
-        .await?;
-
-    Ok(response)
 }
 
 /// delete points (blocking)
