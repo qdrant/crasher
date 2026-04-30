@@ -243,12 +243,13 @@ pub async fn query_batch_points(
     Ok(response)
 }
 
-/// Scroll the entire collection, invoking `on_point` for every retrieved point.
+/// Scroll the collection (optionally filtered), invoking `on_point` for every retrieved point.
 ///
 /// Pagination is handled internally; memory is bounded by page size, not collection size.
 pub async fn scroll_all_points<F>(
     client: &Qdrant,
     collection_name: &str,
+    filter: Option<Filter>,
     with_payload: bool,
     with_vectors: bool,
     mut on_point: F,
@@ -263,6 +264,9 @@ where
             .with_payload(with_payload)
             .with_vectors(with_vectors)
             .limit(page_size);
+        if let Some(filter) = filter.clone() {
+            builder = builder.filter(filter);
+        }
         if let Some(off) = next_offset.take() {
             builder = builder.offset(off);
         }

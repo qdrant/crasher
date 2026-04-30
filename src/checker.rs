@@ -37,7 +37,7 @@ pub async fn check_points_consistency(
     let mut uuid_ids: Vec<String> = Vec::new();
     let mut malformed_points_errors: Vec<String> = Vec::new();
 
-    scroll_all_points(client, collection_name, true, true, |point| {
+    scroll_all_points(client, collection_name, None, true, true, |point| {
         // Track id occurrences and bucket by type
         match point.id.as_ref().and_then(|p| p.point_id_options.as_ref()) {
             Some(PointIdOptions::Num(id)) => {
@@ -311,6 +311,76 @@ pub async fn check_payload_indexes_consistency(
         Err(Invariant(format!(
             "Payload indexes disagree with total point count ({total_count}):\n{}",
             details.join("\n")
+        )))
+    }
+}
+
+/// Cross-check that `count(filter)` and `scroll(filter)` return the same number of points.
+///
+/// Catches divergence between the index-driven count path and the storage-iteration scroll
+/// path: a payload-index bug that drops records from one but not the other would slip past
+/// every other check (the indexes can still agree on totals — see
+/// [`check_payload_indexes_consistency`] — yet count and scroll disagree).
+///
+/// Uses a small set of stable filters so it doesn't need an RNG. Both filters target the
+/// mandatory payload keys and have well-known expected results across the collection.
+pub async fn check_count_scroll_parity(
+    collection_name: &str,
+    client: &Qdrant,
+) -> Result<(), CrasherError> {
+    // Every inserted point sets MANDATORY_PAYLOAD_BOOL_KEY=true and a non-null timestamp,
+    // so case (a) should match all points and case (b) should match none — but the value of
+    // the parity check holds regardless of the absolute counts.
+    let cases: [(&str, Filter); 2] = [
+        (
+            "match-mandatory-bool-true",
+            Filter::must([Condition::matches(MANDATORY_PAYLOAD_BOOL_KEY, true)]),
+        ),
+        (
+            "is-empty-mandatory-timestamp",
+            Filter::must([Condition::is_empty(MANDATORY_PAYLOAD_TIMESTAMP_KEY)]),
+        ),
+    ];
+
+    let mut errors: Vec<String> = Vec::new();
+    for (name, filter) in cases {
+        let count = client
+            .count(
+                CountPointsBuilder::new(collection_name)
+                    .filter(filter.clone())
+                    .exact(true),
+            )
+            .await?
+            .result
+            .unwrap()
+            .count;
+
+        let mut scroll_count: u64 = 0;
+        scroll_all_points(
+            client,
+            collection_name,
+            Some(filter),
+            false,
+            false,
+            |_point| {
+                scroll_count += 1;
+            },
+        )
+        .await?;
+
+        if count != scroll_count {
+            errors.push(format!(
+                "filter '{name}': count={count}, scroll={scroll_count}"
+            ));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(Invariant(format!(
+            "Count/scroll filter parity violations:\n{}",
+            errors.join("\n"),
         )))
     }
 }
