@@ -350,28 +350,68 @@ pub async fn check_optimizer_status(
     Ok(())
 }
 
+/// Sanity-check a batched query response.
+///
+/// Per scored point: score must be finite, returned vectors must not be all-zero.
+/// Per per-query result: scores must be monotonic (either non-increasing or non-decreasing) —
+/// the direction is not asserted because the workload mixes Cosine/Dot (higher = better)
+/// and Euclid/Manhattan (lower = better) named vectors. Both directions are valid; what's
+/// invalid is a zig-zag, which would indicate the result list isn't sorted at all.
 pub fn check_search_result(results: &QueryBatchResponse) -> Result<(), CrasherError> {
-    // assert no vector is only containing zeros
-    for point in results.result.iter().flat_map(|result| &result.result) {
-        if let Some(vectors) = point
-            .vectors
-            .as_ref()
-            .and_then(|v| v.vectors_options.as_ref())
-        {
-            let zeroed_vector = match vectors {
-                VectorsOptions::Vector(v) => check_zeroed_vector(v).then_some((String::new(), v)),
-                VectorsOptions::Vectors(vectors) => vectors
-                    .vectors
-                    .iter()
-                    .find_map(|(name, v)| check_zeroed_vector(v).then_some((name.clone(), v))),
-            };
-            if let Some((name, vector)) = zeroed_vector {
-                return Err(Invariant(format!(
-                    "Query result contains zeroed vector: \npoint id: {:?}\nzeroed vector name: {}\nzeroed vector: {:?}\n\npoint: {:?}",
-                    point.id, name, vector, point
-                )));
+    let mut errors: Vec<String> = Vec::new();
+
+    for (query_idx, batch_result) in results.result.iter().enumerate() {
+        for (rank, point) in batch_result.result.iter().enumerate() {
+            // finite score
+            if !point.score.is_finite() {
+                errors.push(format!(
+                    "query #{query_idx} rank #{rank}: non-finite score {} for point {:?}",
+                    point.score, point.id,
+                ));
+            }
+            // zeroed vectors
+            if let Some(vectors) = point
+                .vectors
+                .as_ref()
+                .and_then(|v| v.vectors_options.as_ref())
+            {
+                let zeroed_vector = match vectors {
+                    VectorsOptions::Vector(v) => {
+                        check_zeroed_vector(v).then_some((String::new(), v))
+                    }
+                    VectorsOptions::Vectors(vectors) => vectors
+                        .vectors
+                        .iter()
+                        .find_map(|(name, v)| check_zeroed_vector(v).then_some((name.clone(), v))),
+                };
+                if let Some((name, vector)) = zeroed_vector {
+                    errors.push(format!(
+                        "query #{query_idx} rank #{rank}: zeroed vector '{name}' on point {:?}: {vector:?}",
+                        point.id,
+                    ));
+                }
+            }
+        }
+
+        // monotonicity (only when every score is finite — otherwise comparison is meaningless)
+        let scores: Vec<f32> = batch_result.result.iter().map(|p| p.score).collect();
+        if scores.len() >= 2 && scores.iter().all(|s| s.is_finite()) {
+            let non_increasing = scores.windows(2).all(|w| w[0] >= w[1]);
+            let non_decreasing = scores.windows(2).all(|w| w[0] <= w[1]);
+            if !non_increasing && !non_decreasing {
+                errors.push(format!(
+                    "query #{query_idx}: scores not monotonic: {scores:?}"
+                ));
             }
         }
     }
-    Ok(())
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(Invariant(format!(
+            "Search result violations:\n{}",
+            errors.join("\n"),
+        )))
+    }
 }
