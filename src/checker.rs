@@ -1,4 +1,4 @@
-use crate::client::{get_collection_info, scroll_all_points};
+use crate::client::{get_collection_info, get_exact_points_count, scroll_all_points};
 use crate::crasher_error::CrasherError::Invariant;
 use ahash::{AHashMap, AHashSet};
 use qdrant_client::Qdrant;
@@ -253,14 +253,18 @@ const INDEXED_PAYLOAD_KEYS: &[&str] = &[
     UUID_PAYLOAD_KEY,
 ];
 
-/// Check that all indexed payload fields report the same total count (non_empty + empty).
-/// A divergence between indexes indicates index corruption after a crash.
+/// Check that every indexed payload field's total (non_empty + empty) equals the unfiltered
+/// point count. A divergence indicates index corruption after a crash.
+///
+/// Stronger than a pairwise inter-index agreement check: if a bug drops the same record
+/// from every index, all indexes still agree with each other but disagree with the oracle.
 pub async fn check_payload_indexes_consistency(
     collection_name: &str,
     client: &Qdrant,
 ) -> Result<(), CrasherError> {
-    let mut index_totals: Vec<(&str, u64, u64)> = Vec::new();
+    let total_count = get_exact_points_count(client, collection_name).await? as u64;
 
+    let mut index_totals: Vec<(&str, u64, u64)> = Vec::new();
     for &field_name in INDEXED_PAYLOAD_KEYS {
         let non_empty_count = client
             .count(
@@ -287,26 +291,25 @@ pub async fn check_payload_indexes_consistency(
         index_totals.push((field_name, non_empty_count, empty_count));
     }
 
-    let totals: Vec<u64> = index_totals
+    let mismatches: Vec<&(&str, u64, u64)> = index_totals
         .iter()
-        .map(|(_, non_empty, empty)| non_empty + empty)
+        .filter(|(_, non_empty, empty)| non_empty + empty != total_count)
         .collect();
 
-    // All indexes should agree on the total
-    if totals.windows(2).all(|w| w[0] == w[1]) {
+    if mismatches.is_empty() {
         Ok(())
     } else {
-        let details: Vec<String> = index_totals
+        let details: Vec<String> = mismatches
             .iter()
             .map(|(name, non_empty, empty)| {
                 format!(
-                    "'{name}': non_empty({non_empty}) + empty({empty}) = {}",
+                    "'{name}': non_empty({non_empty}) + empty({empty}) = {} (expected {total_count})",
                     non_empty + empty
                 )
             })
             .collect();
         Err(Invariant(format!(
-            "Payload indexes report different totals:\n{}",
+            "Payload indexes disagree with total point count ({total_count}):\n{}",
             details.join("\n")
         )))
     }
