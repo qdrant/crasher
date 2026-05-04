@@ -61,10 +61,16 @@ pub const MULTI_VECTOR_NAME_SQ: &str = "multi-dense-vector-sq";
 pub const MULTI_VECTOR_NAME_PQ: &str = "multi-dense-vector-pq";
 pub const MULTI_VECTOR_NAME_BQ: &str = "multi-dense-vector-bq";
 
-/// Mandatory payload keys (present on all points)
+/// Mandatory payload keys (present on every point with deterministic per-id values).
+/// Each one is also indexed, so the index path can be cross-checked against a known oracle.
 pub const MANDATORY_PAYLOAD_TIMESTAMP_KEY: &str = "mandatory-payload-timestamp";
 pub const MANDATORY_PAYLOAD_BOOL_KEY: &str = "mandatory-payload-bool";
-// TODO add one mandatory key per index type
+pub const MANDATORY_PAYLOAD_KEYWORD_KEY: &str = "mandatory-payload-keyword";
+pub const MANDATORY_PAYLOAD_INTEGER_KEY: &str = "mandatory-payload-integer";
+pub const MANDATORY_PAYLOAD_FLOAT_KEY: &str = "mandatory-payload-float";
+pub const MANDATORY_PAYLOAD_GEO_KEY: &str = "mandatory-payload-geo";
+pub const MANDATORY_PAYLOAD_TEXT_KEY: &str = "mandatory-payload-text";
+pub const MANDATORY_PAYLOAD_UUID_KEY: &str = "mandatory-payload-uuid";
 
 // Indexed payload keys
 pub const KEYWORD_PAYLOAD_KEY: &str = "crasher-payload-keyword";
@@ -947,6 +953,40 @@ pub fn random_sentence(rng: &mut impl Rng, num_variants: u32) -> String {
     let variant = rng.random_range(0..num_variants);
     let words: Vec<_> = WORDS.iter().take(variant as usize).copied().collect();
     words.join(" ")
+}
+
+/// Set every mandatory payload key on `payload`, with values that are deterministic in
+/// `point_id` so that any indexed-field check can use the value as a per-id oracle.
+///
+/// Geo deliberately wraps modulo 180/360, so points share lat/lon under a small modulus —
+/// duplicates there don't matter for the existence check, and exact-match queries on geo
+/// aren't part of the oracle. Float values are id*0.5, exactly representable as f32/f64.
+/// UUID is built from `point_id.to_le_bytes()` padded to 16 bytes; unique per id.
+pub fn add_mandatory_payload(payload: &mut Payload, point_id: u64) {
+    payload.insert(
+        MANDATORY_PAYLOAD_TIMESTAMP_KEY,
+        chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+    );
+    payload.insert(MANDATORY_PAYLOAD_BOOL_KEY, true);
+    payload.insert(MANDATORY_PAYLOAD_KEYWORD_KEY, format!("kw_{point_id}"));
+    payload.insert(MANDATORY_PAYLOAD_INTEGER_KEY, point_id as i64);
+    payload.insert(MANDATORY_PAYLOAD_FLOAT_KEY, (point_id as f64) * 0.5);
+
+    let lat = (point_id % 180) as f64 - 90.0;
+    let lon = (point_id % 360) as f64 - 180.0;
+    payload.insert(MANDATORY_PAYLOAD_GEO_KEY, json!({"lat": lat, "lon": lon}));
+
+    payload.insert(
+        MANDATORY_PAYLOAD_TEXT_KEY,
+        format!("mandatory text {point_id}"),
+    );
+
+    let mut bytes = [0u8; 16];
+    bytes[..8].copy_from_slice(&point_id.to_le_bytes());
+    payload.insert(
+        MANDATORY_PAYLOAD_UUID_KEY,
+        uuid::Uuid::from_bytes(bytes).to_string(),
+    );
 }
 
 pub fn random_payload(rng: &mut impl Rng, keywords: Option<u32>) -> Payload {

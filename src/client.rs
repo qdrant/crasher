@@ -5,8 +5,11 @@ use crate::crasher_error::CrasherError::Cancelled;
 use crate::generators::{
     BOOL_PAYLOAD_KEY, DATETIME_PAYLOAD_KEY, FLOAT_PAYLOAD_KEY, GEO_PAYLOAD_KEY,
     INTEGER_PAYLOAD_KEY, KEYWORD_PAYLOAD_KEY, MANDATORY_PAYLOAD_BOOL_KEY,
-    MANDATORY_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY, TestNamedVectors, UUID_PAYLOAD_KEY,
-    random_dense_vector, random_filter, random_payload, random_sparse_vector,
+    MANDATORY_PAYLOAD_FLOAT_KEY, MANDATORY_PAYLOAD_GEO_KEY, MANDATORY_PAYLOAD_INTEGER_KEY,
+    MANDATORY_PAYLOAD_KEYWORD_KEY, MANDATORY_PAYLOAD_TEXT_KEY, MANDATORY_PAYLOAD_TIMESTAMP_KEY,
+    MANDATORY_PAYLOAD_UUID_KEY, TEXT_PAYLOAD_KEY, TestNamedVectors, UUID_PAYLOAD_KEY,
+    add_mandatory_payload, random_dense_vector, random_filter, random_payload,
+    random_sparse_vector,
 };
 
 use qdrant_client::Qdrant;
@@ -423,11 +426,7 @@ pub async fn insert_points_batch(
             let mut payload = random_payload(rng, Some(payload_count));
 
             if mandatory_payload {
-                payload.insert(
-                    MANDATORY_PAYLOAD_TIMESTAMP_KEY,
-                    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-                );
-                payload.insert(MANDATORY_PAYLOAD_BOOL_KEY, true);
+                add_mandatory_payload(&mut payload, idx);
             }
 
             points.push(PointStruct::new(point_id, vectors, payload));
@@ -596,6 +595,67 @@ pub async fn create_payload_indexes(
         MANDATORY_PAYLOAD_BOOL_KEY,
         FieldType::Bool,
         BoolIndexParamsBuilder::default().on_disk(true),
+    )
+    .await?;
+    create_field_index(
+        client,
+        collection_name,
+        MANDATORY_PAYLOAD_KEYWORD_KEY,
+        FieldType::Keyword,
+        KeywordIndexParamsBuilder::default()
+            .is_tenant(true)
+            .on_disk(true),
+    )
+    .await?;
+    create_field_index(
+        client,
+        collection_name,
+        MANDATORY_PAYLOAD_INTEGER_KEY,
+        FieldType::Integer,
+        IntegerIndexParamsBuilder::new(true, true)
+            .is_principal(true)
+            .on_disk(true),
+    )
+    .await?;
+    create_field_index(
+        client,
+        collection_name,
+        MANDATORY_PAYLOAD_FLOAT_KEY,
+        FieldType::Float,
+        FloatIndexParamsBuilder::default()
+            .is_principal(true)
+            .on_disk(true),
+    )
+    .await?;
+    create_field_index(
+        client,
+        collection_name,
+        MANDATORY_PAYLOAD_GEO_KEY,
+        FieldType::Geo,
+        GeoIndexParamsBuilder::default().on_disk(true),
+    )
+    .await?;
+    create_field_index(
+        client,
+        collection_name,
+        MANDATORY_PAYLOAD_TEXT_KEY,
+        FieldType::Text,
+        TextIndexParamsBuilder::new(TokenizerType::Multilingual)
+            .ascii_folding(true)
+            .snowball_stemmer("english".to_string())
+            .stopwords_language("english".to_string())
+            .phrase_matching(true)
+            .on_disk(true),
+    )
+    .await?;
+    create_field_index(
+        client,
+        collection_name,
+        MANDATORY_PAYLOAD_UUID_KEY,
+        FieldType::Uuid,
+        UuidIndexParamsBuilder::default()
+            .is_tenant(true)
+            .on_disk(true),
     )
     .await?;
     Ok(())

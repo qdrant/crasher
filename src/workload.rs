@@ -11,8 +11,8 @@ use tokio::time::sleep;
 use crate::args::Args;
 use crate::checker::{
     check_count_scroll_parity, check_filter_bool_index, check_filter_null_index,
-    check_optimizer_status, check_payload_indexes_consistency, check_points_consistency,
-    check_search_result,
+    check_mandatory_payload_keys_present, check_optimizer_status,
+    check_payload_indexes_consistency, check_points_consistency, check_search_result,
 };
 use crate::client::{
     create_collection, create_collection_snapshot, create_payload_indexes, delete_collection,
@@ -347,6 +347,13 @@ impl Workload {
         // count(filter) vs scroll(filter) parity on stable filters
         match check_count_scroll_parity(&self.collection_name, client).await {
             Err(Invariant(e)) => errors.push(format!("*Count/scroll filter parity*\n{e}")),
+            Err(e) => return Err(e),
+            Ok(()) => (),
+        }
+
+        // every mandatory payload key must be set on every point (per-index oracle)
+        match check_mandatory_payload_keys_present(&self.collection_name, client).await {
+            Err(Invariant(e)) => errors.push(format!("*Mandatory payload keys*\n{e}")),
             Err(e) => return Err(e),
             Ok(()) => (),
         }

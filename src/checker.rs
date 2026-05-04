@@ -13,7 +13,9 @@ use crate::crasher_error::CrasherError;
 use crate::generators::{
     BOOL_PAYLOAD_KEY, DATETIME_PAYLOAD_KEY, FLOAT_PAYLOAD_KEY, GEO_PAYLOAD_KEY,
     INTEGER_PAYLOAD_KEY, KEYWORD_PAYLOAD_KEY, MANDATORY_PAYLOAD_BOOL_KEY,
-    MANDATORY_PAYLOAD_TIMESTAMP_KEY, TEXT_PAYLOAD_KEY, UUID_PAYLOAD_KEY,
+    MANDATORY_PAYLOAD_FLOAT_KEY, MANDATORY_PAYLOAD_GEO_KEY, MANDATORY_PAYLOAD_INTEGER_KEY,
+    MANDATORY_PAYLOAD_KEYWORD_KEY, MANDATORY_PAYLOAD_TEXT_KEY, MANDATORY_PAYLOAD_TIMESTAMP_KEY,
+    MANDATORY_PAYLOAD_UUID_KEY, TEXT_PAYLOAD_KEY, UUID_PAYLOAD_KEY,
 };
 
 /// Scroll-based consistency check over the whole collection.
@@ -311,6 +313,64 @@ pub async fn check_payload_indexes_consistency(
         Err(Invariant(format!(
             "Payload indexes disagree with total point count ({total_count}):\n{}",
             details.join("\n")
+        )))
+    }
+}
+
+/// Mandatory indexed payload keys that the workload always sets via `add_mandatory_payload`.
+/// Each one has a corresponding field index, so a divergence between "everyone has this key"
+/// (the workload guarantee) and `count(is_empty(key))` (what the index reports) is a bug.
+///
+/// `MANDATORY_PAYLOAD_BOOL_KEY` and `MANDATORY_PAYLOAD_TIMESTAMP_KEY` already have dedicated
+/// checks (`check_filter_bool_index`, `check_filter_null_index`) that go further than just
+/// "non-empty"; they're not duplicated here.
+const MANDATORY_INDEXED_PAYLOAD_KEYS: &[&str] = &[
+    MANDATORY_PAYLOAD_KEYWORD_KEY,
+    MANDATORY_PAYLOAD_INTEGER_KEY,
+    MANDATORY_PAYLOAD_FLOAT_KEY,
+    MANDATORY_PAYLOAD_GEO_KEY,
+    MANDATORY_PAYLOAD_TEXT_KEY,
+    MANDATORY_PAYLOAD_UUID_KEY,
+];
+
+/// For each mandatory indexed payload key, assert `count(is_empty(key)) == 0`.
+///
+/// The workload writes a deterministic value for every mandatory key on every point, so any
+/// non-zero count from `is_empty` reflects an index that lost — or never indexed — the
+/// underlying value. This is a tighter constraint than the sum-based check in
+/// [`check_payload_indexes_consistency`], which can pass when records are miscategorised
+/// between the empty/non-empty buckets without the sum changing.
+pub async fn check_mandatory_payload_keys_present(
+    collection_name: &str,
+    client: &Qdrant,
+) -> Result<(), CrasherError> {
+    let mut errors: Vec<String> = Vec::new();
+
+    for &key in MANDATORY_INDEXED_PAYLOAD_KEYS {
+        let empty_count = client
+            .count(
+                CountPointsBuilder::new(collection_name)
+                    .filter(Filter::must([Condition::is_empty(key)]))
+                    .exact(true),
+            )
+            .await?
+            .result
+            .unwrap()
+            .count;
+
+        if empty_count != 0 {
+            errors.push(format!(
+                "'{key}': {empty_count} points report is_empty (expected 0)"
+            ));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(Invariant(format!(
+            "Mandatory payload keys missing on some points:\n{}",
+            errors.join("\n"),
         )))
     }
 }
