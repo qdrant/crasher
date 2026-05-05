@@ -35,7 +35,7 @@ pub struct Args {
     #[arg(long, default_value_t = 2)]
     pub segment_count: u32,
     /// Configure the number of shards
-    #[arg(long, default_value_t = 3)]
+    #[arg(long, default_value_t = 2)]
     pub shard_count: u32,
     /// Replication factor for collections
     #[arg(long, default_value_t = 1)]
