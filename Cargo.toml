@@ -15,11 +15,11 @@ futures = { version = "0.3.32", default-features = false, features = [
     "async-await",
     "std",
 ] }
-tokio = { version = "1.52.2", features = ["full"] }
+tokio = { version = "1.52.3", features = ["full"] }
 tokio-stream = { version = "0.1.18", default-features = false, features = [
     "fs",
 ] }
-qdrant-client = "=1.17.0"
+qdrant-client = "1.18.0"
 ctrlc = "3.5.2"
 log = "0.4.29"
 env_logger = "0.11.10"
@@ -28,7 +28,7 @@ uuid = { version = "1.23.1", features = ["v4", "serde"] }
 tonic = "0.12.3"
 reqwest = { version = "0.13.3", features = ["json"] } # for snapshot restore
 ahash = "0.8.12"
-nix = { version = "0.31", features = ["fs"] }
+nix = { version = "0.31.3", features = ["fs"] }
 
 [profile.release]
 lto = "fat"
