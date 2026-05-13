@@ -15,14 +15,21 @@ use crate::checker::{
     check_payload_indexes_consistency, check_points_consistency, check_search_result,
 };
 use crate::client::{
-    create_collection, create_collection_snapshot, create_payload_indexes, delete_collection,
-    delete_collection_snapshot, delete_points, get_collection_info, get_exact_points_count,
-    get_telemetry, insert_points_batch, list_collection_snapshots, query_batch_points,
-    restore_collection_snapshot, set_payload,
+    create_collection, create_collection_snapshot, create_ephemeral_named_vector,
+    create_payload_indexes, delete_collection, delete_collection_snapshot,
+    delete_ephemeral_named_vector, delete_points, dump_segments_diagnostic, get_collection_info,
+    get_exact_points_count, get_telemetry, insert_points_batch, list_collection_snapshots,
+    query_batch_points, restore_collection_snapshot, set_payload,
 };
 use crate::crasher_error::CrasherError;
 use crate::crasher_error::CrasherError::{Cancelled, Client, Invariant};
 use crate::generators::TestNamedVectors;
+
+/// Throwaway named vector name used to exercise the dynamic vector-schema mutation
+/// code path. The name is fixed (not unique per run) so any leftover from a crashed
+/// previous run is wiped when the workload deletes & recreates the collection on
+/// re-entry.
+const EPHEMERAL_VECTOR_NAME: &str = "ephemeral-vec";
 
 pub struct Workload {
     collection_name: String,
@@ -165,6 +172,7 @@ impl Workload {
                 );
                 self.check_data_consistency(
                     client,
+                    http_client,
                     checkable_points,
                     args.only_sparse,
                     "post-crash-check",
@@ -219,8 +227,14 @@ impl Workload {
         // All written points should be confirmed here, as insert_points_batch waits for completion
         let points_count = get_exact_points_count(client, &self.collection_name).await?;
         log::info!("Run: post-point-insert data consistency check");
-        self.check_data_consistency(client, points_count, args.only_sparse, "post-insert-check")
-            .await?;
+        self.check_data_consistency(
+            client,
+            http_client,
+            points_count,
+            args.only_sparse,
+            "post-insert-check",
+        )
+        .await?;
 
         // Starts snapshotting process as the data was ingested properly
         log::info!("Run: trigger collection snapshot in the background");
@@ -229,6 +243,20 @@ impl Workload {
         let is_run_finished = Arc::new(AtomicBool::new(false));
         let finish = is_run_finished.clone();
         let snapshotting_handle = self.trigger_continuous_snapshotting(client, finish);
+
+        // Mutate vector schema while the workload is running. The ephemeral vector is left
+        // un-backfilled; existing points keep their existing named vectors, and snapshots
+        // taken during this window include the extended schema. A crash anywhere up to
+        // the matching delete below is recovered by the collection-exists branch on
+        // re-entry (consistency check tolerates extra names, then delete_collection wipes).
+        log::info!("Run: create ephemeral named vector '{EPHEMERAL_VECTOR_NAME}'");
+        create_ephemeral_named_vector(
+            client,
+            &self.collection_name,
+            EPHEMERAL_VECTOR_NAME,
+            self.vec_dim,
+        )
+        .await?;
 
         log::info!("Run: set payload");
         for point_id in 1..self.points_count {
@@ -254,6 +282,7 @@ impl Workload {
         log::info!("Run: post-payload-insert data consistency check");
         self.check_data_consistency(
             client,
+            http_client,
             points_count,
             args.only_sparse,
             "post-set-payload-check",
@@ -283,6 +312,9 @@ impl Workload {
         log::info!("Run: get full telemetry");
         let _telemetry = get_telemetry(http_client).await?;
 
+        log::info!("Run: delete ephemeral named vector '{EPHEMERAL_VECTOR_NAME}'");
+        delete_ephemeral_named_vector(client, &self.collection_name, EPHEMERAL_VECTOR_NAME).await?;
+
         // Stop ongoing snapshotting task
         is_run_finished.store(true, Ordering::Relaxed);
         match snapshotting_handle.await {
@@ -301,6 +333,7 @@ impl Workload {
     async fn check_data_consistency(
         &self,
         client: &Qdrant,
+        http_client: &reqwest::Client,
         current_count: usize,
         only_sparse: bool,
         context: &str,
@@ -369,8 +402,13 @@ impl Workload {
             return Ok(());
         }
         let full_report = errors.join("\n---\n");
+        let segments_diag = dump_segments_diagnostic(http_client, &self.collection_name)
+            .await
+            .unwrap_or_else(|e| format!("(failed to collect per-segment diagnostic: {e})\n"));
         Err(Invariant(format!(
-            "Data inconsistencies found out of {current_count} points ({context}):\n{full_report}"
+            "Data inconsistencies found out of {current_count} points ({context}):\n\
+             {full_report}\n\
+             {segments_diag}"
         )))
     }
 
@@ -446,6 +484,7 @@ impl Workload {
             );
             self.check_data_consistency(
                 client,
+                http_client,
                 restored_count,
                 args.only_sparse,
                 &format!("snapshot-restore-check-{snapshot_name}"),

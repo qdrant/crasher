@@ -18,9 +18,10 @@ use qdrant_client::qdrant::point_id::PointIdOptions;
 use qdrant_client::qdrant::vectors_config::Config::ParamsMap;
 use qdrant_client::qdrant::{
     BoolIndexParamsBuilder, CollectionInfo, CountPointsBuilder, CreateCollectionBuilder,
-    CreateFieldIndexCollectionBuilder, CreateSnapshotResponse, DatetimeIndexParamsBuilder,
-    DeletePointsBuilder, DeleteSnapshotRequestBuilder, DeleteSnapshotResponse, FieldType,
-    FloatIndexParamsBuilder, GeoIndexParamsBuilder, IntegerIndexParamsBuilder,
+    CreateFieldIndexCollectionBuilder, CreateSnapshotResponse, CreateVectorNameRequestBuilder,
+    DatetimeIndexParamsBuilder, DeletePointsBuilder, DeleteSnapshotRequestBuilder,
+    DeleteSnapshotResponse, DeleteVectorNameRequestBuilder, DenseVectorCreationConfigBuilder,
+    Distance, FieldType, FloatIndexParamsBuilder, GeoIndexParamsBuilder, IntegerIndexParamsBuilder,
     KeywordIndexParamsBuilder, OptimizersConfigDiff, PointId, PointStruct, Query,
     QueryBatchPointsBuilder, QueryBatchResponse, QueryPoints, ReplicaState, RetrievedPoint,
     ScrollPointsBuilder, SetPayloadPointsBuilder, SparseVectorConfig, TextIndexParamsBuilder,
@@ -705,6 +706,43 @@ pub async fn delete_points(client: &Qdrant, collection_name: &str) -> Result<(),
     Ok(())
 }
 
+/// Create an ephemeral named dense vector on an existing collection.
+///
+/// Existing points have no data for this vector; intended for chaos coverage of the
+/// vector-schema-mutation code path. Pair with [`delete_ephemeral_named_vector`].
+pub async fn create_ephemeral_named_vector(
+    client: &Qdrant,
+    collection_name: &str,
+    vector_name: &str,
+    vec_dim: u32,
+) -> Result<(), CrasherError> {
+    client
+        .create_vector_name(
+            CreateVectorNameRequestBuilder::new(
+                collection_name,
+                vector_name,
+                DenseVectorCreationConfigBuilder::new(vec_dim as u64, Distance::Dot),
+            )
+            .wait(true),
+        )
+        .await?;
+    Ok(())
+}
+
+/// Delete a named vector from an existing collection.
+pub async fn delete_ephemeral_named_vector(
+    client: &Qdrant,
+    collection_name: &str,
+    vector_name: &str,
+) -> Result<(), CrasherError> {
+    client
+        .delete_vector_name(
+            DeleteVectorNameRequestBuilder::new(collection_name, vector_name).wait(true),
+        )
+        .await?;
+    Ok(())
+}
+
 /// Trigger collection snapshot
 pub async fn create_collection_snapshot(
     client: &Qdrant,
@@ -783,4 +821,148 @@ pub async fn get_telemetry(client: &reqwest::Client) -> Result<String, CrasherEr
     let json: Value = serde_json::from_str(&response_body)?;
     let pretty = serde_json::to_string_pretty(&json)?;
     Ok(pretty)
+}
+
+/// Pull a per-segment breakdown from the telemetry endpoint for a single collection.
+///
+/// Returns a multi-line human-readable summary: one line per segment with its uuid prefix,
+/// point count, deleted-vector count, and append/index flags, followed by per-field index
+/// counts. Ends with global totals so a single read of the dump tells you whether the
+/// inflation observed by a consistency check (e.g. `count(is_empty(field))` over-counting
+/// vs `get_exact_points_count`) is concentrated in one segment, spread evenly, or sits in
+/// the per-segment null index seeding itself.
+pub async fn dump_segments_diagnostic(
+    http_client: &reqwest::Client,
+    collection_name: &str,
+) -> Result<String, CrasherError> {
+    let url = format!("http://localhost:{HTTP_PORT}/telemetry?details_level=10");
+    let response = http_client.get(&url).send().await?;
+    if !response.status().is_success() {
+        return Err(CrasherError::Invariant(
+            "Failed to get telemetry for segments diagnostic".to_string(),
+        ));
+    }
+    let json: Value = response.json().await?;
+
+    let mut out = String::new();
+    out.push_str(&format!(
+        "--- Per-segment diagnostic for '{collection_name}' ---\n"
+    ));
+
+    let collections = json
+        .pointer("/result/collections/collections")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| {
+            CrasherError::Invariant(
+                "telemetry: missing /result/collections/collections".to_string(),
+            )
+        })?;
+
+    let collection = collections
+        .iter()
+        .find(|c| c.get("id").and_then(|s| s.as_str()) == Some(collection_name))
+        .ok_or_else(|| {
+            CrasherError::Invariant(format!(
+                "telemetry: collection '{collection_name}' not found"
+            ))
+        })?;
+
+    let Some(shards) = collection.get("shards").and_then(|s| s.as_array()) else {
+        out.push_str("(no shards in telemetry)\n");
+        return Ok(out);
+    };
+
+    let mut sum_num_points: u64 = 0;
+    let mut sum_num_deleted_vectors: u64 = 0;
+    let mut per_field_points_total: HashMap<String, u64> = HashMap::new();
+    let mut segment_count: u64 = 0;
+
+    for (shard_idx, shard) in shards.iter().enumerate() {
+        let shard_id = shard
+            .get("id")
+            .and_then(|v| v.as_u64())
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| shard_idx.to_string());
+        out.push_str(&format!("Shard {shard_id}:\n"));
+        let Some(segments) = shard.pointer("/local/segments").and_then(|v| v.as_array()) else {
+            out.push_str("  (no local segments)\n");
+            continue;
+        };
+        for seg in segments {
+            segment_count += 1;
+            let info = seg.get("info");
+            let uuid = info
+                .and_then(|i| i.get("uuid"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
+            let uuid_short: String = uuid.chars().take(8).collect();
+            let num_points = info
+                .and_then(|i| i.get("num_points"))
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let num_vectors = info
+                .and_then(|i| i.get("num_vectors"))
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let num_deleted_vectors = info
+                .and_then(|i| i.get("num_deleted_vectors"))
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let segment_type = info
+                .and_then(|i| i.get("segment_type"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
+            let is_appendable = info
+                .and_then(|i| i.get("is_appendable"))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+
+            sum_num_points += num_points;
+            sum_num_deleted_vectors += num_deleted_vectors;
+
+            out.push_str(&format!(
+                "  [{uuid_short}] type={segment_type} appendable={is_appendable} \
+                 num_points={num_points} num_vectors={num_vectors} \
+                 num_deleted_vectors={num_deleted_vectors}\n"
+            ));
+
+            if let Some(indices) = seg.get("payload_field_indices").and_then(|v| v.as_array()) {
+                for idx in indices {
+                    let field = idx
+                        .get("field_name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
+                    let points_count = idx
+                        .get("points_count")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    let points_values_count = idx
+                        .get("points_values_count")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    let index_type = idx
+                        .get("index_type")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
+                    *per_field_points_total.entry(field.to_owned()).or_default() += points_count;
+                    out.push_str(&format!(
+                        "    field={field} index={index_type} \
+                         points_count={points_count} points_values={points_values_count}\n"
+                    ));
+                }
+            }
+        }
+    }
+
+    out.push_str(&format!(
+        "TOTAL: {segment_count} segments, sum(num_points)={sum_num_points}, \
+         sum(num_deleted_vectors)={sum_num_deleted_vectors}\n"
+    ));
+    let mut field_totals: Vec<_> = per_field_points_total.into_iter().collect();
+    field_totals.sort_by(|a, b| a.0.cmp(&b.0));
+    for (field, total) in field_totals {
+        out.push_str(&format!("  field={field}: sum(points_count)={total}\n"));
+    }
+
+    Ok(out)
 }
