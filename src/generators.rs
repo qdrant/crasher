@@ -7,7 +7,8 @@ use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::{
     BinaryQuantizationBuilder, BinaryQuantizationEncoding, Condition, Distance, Filter,
     HnswConfigDiff, MultiVectorConfig, ProductQuantization, QuantizationConfig, ScalarQuantization,
-    SparseIndexConfig, SparseVectorParams, VectorParams,
+    SparseIndexConfig, SparseVectorParams, TurboQuantBitSize, TurboQuantizationBuilder,
+    VectorParams,
 };
 use rand::{Rng, RngExt};
 use serde_json::json;
@@ -41,6 +42,7 @@ pub const DENSE_VECTOR_NAME_MEMORY_MANHATTAN: &str = "dense-vector-memory-manhat
 pub const DENSE_VECTOR_NAME_HNSW_ON_DISK: &str = "dense-vector-hnsw-on-disk";
 pub const DENSE_VECTOR_NAME_PQ_X16: &str = "dense-vector-pq-x16";
 pub const DENSE_VECTOR_NAME_SQ_RAM: &str = "dense-vector-sq-ram";
+pub const DENSE_VECTOR_NAME_TQ: &str = "dense-vector-tq";
 
 /// Sparse vectors base names
 pub const SPARSE_VECTOR_NAME_INDEX_DISK: &str = "sparse-vector-index-disk";
@@ -609,6 +611,29 @@ impl TestNamedVectors {
                     }),
                     hnsw_config,
                     on_disk: Some(true),
+                    datatype: None,
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors TurboQuant (2-bit)
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_TQ}-{i}");
+            let tq = TurboQuantizationBuilder::new()
+                .bits(TurboQuantBitSize::Bits2)
+                .always_ram(false)
+                .build();
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: Some(QuantizationConfig {
+                        quantization: Some(Quantization::Turboquant(tq)),
+                    }),
+                    hnsw_config,
+                    on_disk: Some(true), // mmap
                     datatype: None,
                     multivector_config: None,
                 },
