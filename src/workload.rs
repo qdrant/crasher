@@ -464,13 +464,29 @@ impl Workload {
             }
 
             log::info!("Run: restoring snapshot '{snapshot_name}'");
-            restore_collection_snapshot(
+            match restore_collection_snapshot(
                 &self.collection_name,
                 snapshot_name,
                 snapshot.checksum(),
                 http_client,
             )
-            .await?;
+            .await
+            {
+                Ok(()) => {}
+                // Snapshots captured during the ephemeral-vector window have a
+                // schema strict-equality check against the current collection.
+                // Drop them and move on instead of aborting the chaos test.
+                Err(Invariant(msg)) if msg.contains("Snapshot is not compatible") => {
+                    log::warn!(
+                        "Skipping snapshot '{snapshot_name}' due to schema \
+                         incompatibility: {msg}"
+                    );
+                    delete_collection_snapshot(client, &self.collection_name, snapshot_name)
+                        .await?;
+                    continue;
+                }
+                Err(e) => return Err(e),
+            }
 
             let restored_count = get_exact_points_count(client, &self.collection_name).await?;
 
