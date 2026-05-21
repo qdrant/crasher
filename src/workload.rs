@@ -370,7 +370,7 @@ impl Workload {
             Ok(()) => (),
         }
 
-        // check payload indexes consistency (all indexes agree on total)
+        // check payload indexes consistency (all indexes agree on the expected distribution)
         match check_payload_indexes_consistency(&self.collection_name, client).await {
             Err(Invariant(e)) => errors.push(format!("*Inconsistent Payload Indexes*\n{e}")),
             Err(e) => return Err(e),

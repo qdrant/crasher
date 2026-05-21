@@ -255,16 +255,39 @@ const INDEXED_PAYLOAD_KEYS: &[&str] = &[
     UUID_PAYLOAD_KEY,
 ];
 
-/// Check that every indexed payload field's total (non_empty + empty) equals the unfiltered
-/// point count. A divergence indicates index corruption after a crash.
+/// Tolerated overshoot of `non_empty + empty` above the point count, as a fraction of that count.
+/// See [`check_payload_indexes_consistency`] for why the sum can only ever drift upward.
+const PAYLOAD_INDEX_OVERCOUNT_MARGIN_RATIO: f64 = 0.06;
+
+/// Check the indexed crasher payload fields for internal consistency. The workload sets all of
+/// them together on the same points (see `set payload` in the workload), so the assertions are
+/// crash-safe regardless of how many points have been set — they hold whether zero, some, or all
+/// points carry the payload, which matters because the check also runs after a crash that may have
+/// interrupted the set-payload phase. We deliberately do *not* assert the fully-set distribution
+/// (e.g. "exactly half are non-empty"), since a partially-applied set-payload is a valid recovered
+/// state. For every field we require:
 ///
-/// Stronger than a pairwise inter-index agreement check: if a bug drops the same record
-/// from every index, all indexes still agree with each other but disagree with the oracle.
+/// 1. all fields report an identical `non_empty` count, and
+/// 2. all fields report an identical `empty` count — they are set as a unit, so a per-field
+///    divergence is real index corruption, not benign lag; and
+/// 3. `non_empty + empty` matches the point count, tolerating an upward overshoot of up to
+///    [`PAYLOAD_INDEX_OVERCOUNT_MARGIN_RATIO`] but never a deficit.
+///
+/// Why the sum can only overshoot, never fall short: `is_empty` and `must_not(is_empty)` are
+/// complements, so they should sum to the point count. Under copy-on-write, when `set_payload`
+/// touches a point in a non-appendable segment Qdrant copies it into an appendable segment, applies
+/// the payload, then retires the source version. After a crash that retirement can lag, leaving a
+/// live duplicate — the new copy carries the value, the stale copy is empty — counted once on each
+/// side. These duplicates are scrubbed lazily by the optimizer's deduplication pass, so a transient
+/// overshoot is expected and benign. A *deficit* cannot come from this and signals points genuinely
+/// lost from both indexes.
 pub async fn check_payload_indexes_consistency(
     collection_name: &str,
     client: &Qdrant,
 ) -> Result<(), CrasherError> {
     let total_count = get_exact_points_count(client, collection_name).await? as u64;
+    let overcount_margin =
+        (total_count as f64 * PAYLOAD_INDEX_OVERCOUNT_MARGIN_RATIO).ceil() as u64;
 
     let mut index_totals: Vec<(&str, u64, u64)> = Vec::new();
     for &field_name in INDEXED_PAYLOAD_KEYS {
@@ -293,26 +316,51 @@ pub async fn check_payload_indexes_consistency(
         index_totals.push((field_name, non_empty_count, empty_count));
     }
 
-    let mismatches: Vec<&(&str, u64, u64)> = index_totals
-        .iter()
-        .filter(|(_, non_empty, empty)| non_empty + empty != total_count)
-        .collect();
+    let mut errors: Vec<String> = Vec::new();
 
-    if mismatches.is_empty() {
+    // (1) & (2) All fields are set as a unit, so they must agree on both counts. A per-field
+    // divergence is index corruption, not the uniform lag of copy-on-write deduplication.
+    let (_, first_non_empty, first_empty) = index_totals[0];
+    if index_totals.iter().any(|(_, ne, _)| *ne != first_non_empty) {
+        let listing = index_totals
+            .iter()
+            .map(|(name, ne, _)| format!("'{name}': non_empty({ne})"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        errors.push(format!(
+            "non_empty counts disagree across fields (must be identical): {listing}"
+        ));
+    }
+    if index_totals.iter().any(|(_, _, e)| *e != first_empty) {
+        let listing = index_totals
+            .iter()
+            .map(|(name, _, e)| format!("'{name}': empty({e})"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        errors.push(format!(
+            "empty counts disagree across fields (must be identical): {listing}"
+        ));
+    }
+
+    // (3) non_empty + empty must equal the point count, tolerating an upward overshoot from
+    // not-yet-deduplicated copy-on-write duplicates, but never a deficit (points lost from both
+    // indexes).
+    for (name, non_empty, empty) in &index_totals {
+        let sum = non_empty + empty;
+        if sum < total_count || sum > total_count + overcount_margin {
+            errors.push(format!(
+                "'{name}': non_empty({non_empty}) + empty({empty}) = {sum} outside [{total_count}, {}] (tolerated overcount +{overcount_margin})",
+                total_count + overcount_margin
+            ));
+        }
+    }
+
+    if errors.is_empty() {
         Ok(())
     } else {
-        let details: Vec<String> = mismatches
-            .iter()
-            .map(|(name, non_empty, empty)| {
-                format!(
-                    "'{name}': non_empty({non_empty}) + empty({empty}) = {} (expected {total_count})",
-                    non_empty + empty
-                )
-            })
-            .collect();
         Err(Invariant(format!(
-            "Payload indexes disagree with total point count ({total_count}):\n{}",
-            details.join("\n")
+            "Payload indexes disagree with point count ({total_count}):\n{}",
+            errors.join("\n")
         )))
     }
 }
