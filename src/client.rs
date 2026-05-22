@@ -776,23 +776,21 @@ pub async fn list_collection_snapshots(
     Ok(snapshots.snapshot_descriptions)
 }
 
-// TODO add to config
-const HTTP_PORT: u32 = 6333;
-
 /// Restore local collection snapshot
 pub async fn restore_collection_snapshot(
     collection_name: &str,
     snapshot_name: &str,
     checksum: &str,
     client: &reqwest::Client,
+    http_port: u32,
 ) -> Result<(), CrasherError> {
     let url =
-        format!("http://localhost:{HTTP_PORT}/collections/{collection_name}/snapshots/recover");
+        format!("http://localhost:{http_port}/collections/{collection_name}/snapshots/recover");
 
     // setup snapshot location
     let body = json!({
         "location": format!(
-            "http://localhost:{HTTP_PORT}/collections/{collection_name}/snapshots/{snapshot_name}"
+            "http://localhost:{http_port}/collections/{collection_name}/snapshots/{snapshot_name}"
         ),
         "priority": "snapshot",
         "checksum": checksum
@@ -809,8 +807,11 @@ pub async fn restore_collection_snapshot(
     Ok(())
 }
 
-pub async fn get_telemetry(client: &reqwest::Client) -> Result<String, CrasherError> {
-    let url = format!("http://localhost:{HTTP_PORT}/telemetry?details_level=10");
+pub async fn get_telemetry(
+    client: &reqwest::Client,
+    http_port: u32,
+) -> Result<String, CrasherError> {
+    let url = format!("http://localhost:{http_port}/telemetry?details_level=10");
     let response = client.get(&url).send().await?;
     if !response.status().is_success() {
         return Err(CrasherError::Invariant(
@@ -834,8 +835,9 @@ pub async fn get_telemetry(client: &reqwest::Client) -> Result<String, CrasherEr
 pub async fn dump_segments_diagnostic(
     http_client: &reqwest::Client,
     collection_name: &str,
+    http_port: u32,
 ) -> Result<String, CrasherError> {
-    let url = format!("http://localhost:{HTTP_PORT}/telemetry?details_level=10");
+    let url = format!("http://localhost:{http_port}/telemetry?details_level=10");
     let response = http_client.get(&url).send().await?;
     if !response.status().is_success() {
         return Err(CrasherError::Invariant(

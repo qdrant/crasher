@@ -58,6 +58,9 @@ pub struct Args {
     /// Timeout of HTTP client
     #[arg(long, default_value_t = 60_000)]
     pub http_timeout_ms: u64,
+    /// HTTP port of the Qdrant REST API (used for snapshot restore and telemetry)
+    #[arg(long, default_value_t = 6333)]
+    pub http_port: u32,
     /// Whether to use on-disk payload storage
     #[arg(long, default_value_t = true)]
     pub on_disk_payload: bool,

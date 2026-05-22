@@ -176,6 +176,7 @@ impl Workload {
                     checkable_points,
                     args.only_sparse,
                     "post-crash-check",
+                    args.http_port,
                 )
                 .await?;
             }
@@ -233,6 +234,7 @@ impl Workload {
             points_count,
             args.only_sparse,
             "post-insert-check",
+            args.http_port,
         )
         .await?;
 
@@ -286,6 +288,7 @@ impl Workload {
             points_count,
             args.only_sparse,
             "post-set-payload-check",
+            args.http_port,
         )
         .await?;
 
@@ -310,7 +313,7 @@ impl Workload {
         }
 
         log::info!("Run: get full telemetry");
-        let _telemetry = get_telemetry(http_client).await?;
+        let _telemetry = get_telemetry(http_client, args.http_port).await?;
 
         log::info!("Run: delete ephemeral named vector '{EPHEMERAL_VECTOR_NAME}'");
         delete_ephemeral_named_vector(client, &self.collection_name, EPHEMERAL_VECTOR_NAME).await?;
@@ -337,6 +340,7 @@ impl Workload {
         current_count: usize,
         only_sparse: bool,
         context: &str,
+        http_port: u32,
     ) -> Result<(), CrasherError> {
         let mut errors = Vec::new();
 
@@ -402,7 +406,7 @@ impl Workload {
             return Ok(());
         }
         let full_report = errors.join("\n---\n");
-        let segments_diag = dump_segments_diagnostic(http_client, &self.collection_name)
+        let segments_diag = dump_segments_diagnostic(http_client, &self.collection_name, http_port)
             .await
             .unwrap_or_else(|e| format!("(failed to collect per-segment diagnostic: {e})\n"));
         Err(Invariant(format!(
@@ -469,6 +473,7 @@ impl Workload {
                 snapshot_name,
                 snapshot.checksum(),
                 http_client,
+                args.http_port,
             )
             .await
             {
@@ -504,6 +509,7 @@ impl Workload {
                 restored_count,
                 args.only_sparse,
                 &format!("snapshot-restore-check-{snapshot_name}"),
+                args.http_port,
             )
             .await?;
             // cleanup
