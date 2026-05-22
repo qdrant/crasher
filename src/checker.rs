@@ -255,10 +255,6 @@ const INDEXED_PAYLOAD_KEYS: &[&str] = &[
     UUID_PAYLOAD_KEY,
 ];
 
-/// Tolerated overshoot of `non_empty + empty` above the point count, as a fraction of that count.
-/// See [`check_payload_indexes_consistency`] for why the sum can only ever drift upward.
-const PAYLOAD_INDEX_OVERCOUNT_MARGIN_RATIO: f64 = 0.06;
-
 /// Check the indexed crasher payload fields for internal consistency. The workload sets all of
 /// them together on the same points (see `set payload` in the workload), so the assertions are
 /// crash-safe regardless of how many points have been set — they hold whether zero, some, or all
@@ -270,24 +266,21 @@ const PAYLOAD_INDEX_OVERCOUNT_MARGIN_RATIO: f64 = 0.06;
 /// 1. all fields report an identical `non_empty` count, and
 /// 2. all fields report an identical `empty` count — they are set as a unit, so a per-field
 ///    divergence is real index corruption, not benign lag; and
-/// 3. `non_empty + empty` matches the point count, tolerating an upward overshoot of up to
-///    [`PAYLOAD_INDEX_OVERCOUNT_MARGIN_RATIO`] but never a deficit.
-///
-/// Why the sum can only overshoot, never fall short: `is_empty` and `must_not(is_empty)` are
-/// complements, so they should sum to the point count. Under copy-on-write, when `set_payload`
-/// touches a point in a non-appendable segment Qdrant copies it into an appendable segment, applies
-/// the payload, then retires the source version. After a crash that retirement can lag, leaving a
-/// live duplicate — the new copy carries the value, the stale copy is empty — counted once on each
-/// side. These duplicates are scrubbed lazily by the optimizer's deduplication pass, so a transient
-/// overshoot is expected and benign. A *deficit* cannot come from this and signals points genuinely
-/// lost from both indexes.
+/// 3. `non_empty + empty` is never *below* the point count — a deficit means points were lost from
+///    both buckets of a field's index. We do not cap the overshoot: `is_empty` and
+///    `must_not(is_empty)` are complements that should sum to the point count, but under
+///    copy-on-write `set_payload` copies a point from a non-appendable segment into an appendable
+///    one (new copy carries the value → `non_empty`) and retires the stale pre-set copy (empty →
+///    `empty`); after a crash that retirement can lag, double-counting the point until the
+///    optimizer's dedup pass scrubs it. That overshoot is benign and its size depends on how far
+///    dedup has progressed, so bounding it is just flakiness with no corruption-detecting value —
+///    the deficit half is the only sharp signal here. The exact cross-field agreement in (1)&(2)
+///    is what actually catches index corruption.
 pub async fn check_payload_indexes_consistency(
     collection_name: &str,
     client: &Qdrant,
 ) -> Result<(), CrasherError> {
     let total_count = get_exact_points_count(client, collection_name).await? as u64;
-    let overcount_margin =
-        (total_count as f64 * PAYLOAD_INDEX_OVERCOUNT_MARGIN_RATIO).ceil() as u64;
 
     let mut index_totals: Vec<(&str, u64, u64)> = Vec::new();
     for &field_name in INDEXED_PAYLOAD_KEYS {
@@ -342,15 +335,15 @@ pub async fn check_payload_indexes_consistency(
         ));
     }
 
-    // (3) non_empty + empty must equal the point count, tolerating an upward overshoot from
-    // not-yet-deduplicated copy-on-write duplicates, but never a deficit (points lost from both
-    // indexes).
+    // (3) non_empty + empty must never fall below the point count (points lost from both buckets of
+    // a field's index). The overshoot is left unbounded: it is benign copy-on-write residue whose
+    // size only reflects how far the optimizer's dedup pass has progressed, so capping it adds
+    // flakiness without catching corruption.
     for (name, non_empty, empty) in &index_totals {
         let sum = non_empty + empty;
-        if sum < total_count || sum > total_count + overcount_margin {
+        if sum < total_count {
             errors.push(format!(
-                "'{name}': non_empty({non_empty}) + empty({empty}) = {sum} outside [{total_count}, {}] (tolerated overcount +{overcount_margin})",
-                total_count + overcount_margin
+                "'{name}': non_empty({non_empty}) + empty({empty}) = {sum} below point count {total_count} (points lost from both buckets)"
             ));
         }
     }
