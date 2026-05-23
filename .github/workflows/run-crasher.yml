@@ -93,7 +93,7 @@ jobs:
           ref: ${{ steps.default_inputs.outputs.qdrant_version }}
           path: ./qdrant-src
       - name: Cache deps
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: |
             /home/runner/work/crasher/crasher
@@ -145,7 +145,7 @@ jobs:
           path: qdrant-workdir.tar
       - name: Send Notification
         if: failure() || cancelled()
-        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
         with:
           payload: |
             {
