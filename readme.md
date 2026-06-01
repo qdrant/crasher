@@ -56,7 +56,7 @@ Options:
       --only-sparse
           Whether to only upsert sparse vectors
       --duplication-factor <DUPLICATION_FACTOR>
-          Duplication factor for generating additional named vectors [default: 2]
+          Duplication factor for generating additional named vectors [default: 1]
       --skip-snapshot-restore
           Whether to perform snapshot restore
       --shutdown-on-error
@@ -73,7 +73,7 @@ Options:
 
 ## Vector configurations
 
-Each base configuration is multiplied by the `--duplication-factor` (default: 2).
+Each base configuration is multiplied by the `--duplication-factor` (default: 1).
 
 ### Dense vectors
 

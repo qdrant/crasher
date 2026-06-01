@@ -68,7 +68,7 @@ pub struct Args {
     #[arg(long, default_value_t = false)]
     pub only_sparse: bool,
     /// Duplication factor for generating additional named vectors
-    #[arg(long, default_value_t = 2)]
+    #[arg(long, default_value_t = 1)]
     pub duplication_factor: u32,
     /// Whether to perform snapshot restore
     #[arg(long, default_value_t = false)]
