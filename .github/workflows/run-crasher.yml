@@ -92,12 +92,6 @@ jobs:
           repository: qdrant/qdrant
           ref: ${{ steps.default_inputs.outputs.qdrant_version }}
           path: ./qdrant-src
-      - name: Cache deps
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-        with:
-          workspaces: |
-            /home/runner/work/crasher/crasher
-            /home/runner/work/crasher/crasher/qdrant-src
       - name: Build Crasher (release)
         run: cargo build --release
       - name: Build Qdrant (debug)
