@@ -20,6 +20,7 @@ pub const DENSE_VECTOR_NAME_MMAP: &str = "dense-vector-mmap";
 pub const DENSE_VECTOR_NAME_MEMORY: &str = "dense-vector-memory";
 pub const DENSE_VECTOR_NAME_UINT8: &str = "dense-vector-uint8";
 pub const DENSE_VECTOR_NAME_FLOAT16: &str = "dense-vector-float16";
+pub const DENSE_VECTOR_NAME_TURBO4: &str = "dense-vector-turbo4";
 pub const DENSE_VECTOR_NAME_SQ: &str = "dense-vector-sq";
 pub const DENSE_VECTOR_NAME_PQ: &str = "dense-vector-pq";
 pub const DENSE_VECTOR_NAME_BQ_1B: &str = "dense-vector-bq-1b";
@@ -34,6 +35,7 @@ pub const DENSE_VECTOR_NAME_MEMORY_PQ: &str = "dense-vector-memory-pq";
 pub const DENSE_VECTOR_NAME_MEMORY_BQ: &str = "dense-vector-memory-bq";
 pub const DENSE_VECTOR_NAME_MEMORY_UINT8: &str = "dense-vector-memory-uint8";
 pub const DENSE_VECTOR_NAME_MEMORY_FLOAT16: &str = "dense-vector-memory-float16";
+pub const DENSE_VECTOR_NAME_MEMORY_TURBO4: &str = "dense-vector-memory-turbo4";
 pub const DENSE_VECTOR_NAME_MEMORY_BQ_1HB: &str = "dense-vector-memory-bq-1Hb";
 pub const DENSE_VECTOR_NAME_MEMORY_BQ_2B: &str = "dense-vector-memory-bq-2b";
 pub const DENSE_VECTOR_NAME_MEMORY_COSINE: &str = "dense-vector-memory-cosine";
@@ -192,6 +194,23 @@ impl TestNamedVectors {
                     hnsw_config,
                     on_disk: Some(true), // mmap
                     datatype: Some(3),   // Float16
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors turbo4 (4-bit TurboQuant storage datatype)
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_TURBO4}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config,
+                    on_disk: Some(true), // mmap
+                    datatype: Some(4),   // Turbo4
                     multivector_config: None,
                 },
             );
@@ -573,6 +592,23 @@ impl TestNamedVectors {
                     hnsw_config,
                     on_disk: Some(false), // memory
                     datatype: Some(3),    // Float16
+                    multivector_config: None,
+                },
+            );
+        }
+
+        // dense vectors memory + turbo4 (4-bit TurboQuant storage datatype)
+        for i in 1..=duplication_factor {
+            let name = format!("{DENSE_VECTOR_NAME_MEMORY_TURBO4}-{i}");
+            dense.insert(
+                name,
+                VectorParams {
+                    size: vec_dim as u64,
+                    distance: Distance::Dot.into(),
+                    quantization_config: None,
+                    hnsw_config,
+                    on_disk: Some(false), // memory
+                    datatype: Some(4),    // Turbo4
                     multivector_config: None,
                 },
             );
