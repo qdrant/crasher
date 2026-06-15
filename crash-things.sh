@@ -25,6 +25,12 @@ CRASHER_CMD=(
 
 echo "${CRASHER_CMD[*]}"
 
+# Run the crasher in its own process group (job control monitor mode) so we can
+# reap the WHOLE tree (cargo -> crasher -> qdrant) on exit. Otherwise an orphaned
+# qdrant survives, keeps the CI runner's stdout/stderr pipe open and hangs the job
+# until GitHub's hard timeout (this is what caused a 6h run).
+set -m
+
 QDRANT__LOGGER__ON_DISK__ENABLED=true \
 QDRANT__LOGGER__ON_DISK__LOG_FILE=$QDRANT_LOG \
 QDRANT__SERVICE__HARDWARE_REPORTING=true \
@@ -35,13 +41,14 @@ QDRANT__LOG_LEVEL="TRACE,raft::raft=info,actix_http=info,tonic=info,want=info,mi
 
 pid=$!
 
+set +m
+
 echo "The PID is $pid"
 
 function cleanup() {
-    if ps -p $pid >/dev/null
-    then
-        kill -KILL $pid
-    fi
+    # SIGKILL the whole process group (-$pid). Stays valid as long as any member
+    # is alive, so this reaps a surviving qdrant even if cargo already exited.
+    kill -KILL -- -"$pid" 2>/dev/null || true
 }
 
 trap cleanup EXIT
@@ -59,9 +66,12 @@ done
 if ps -p $pid >/dev/null
 then
     echo "The process is still running. Stopping the process..."
-    kill $pid
+    kill -- -"$pid" 2>/dev/null || true
     echo "OK"
 else
     echo "The process has unexpectedly terminated on its own. Check the logs."
+    # Reap any orphaned children (e.g. qdrant) still holding the runner pipe,
+    # otherwise the job hangs even though the crasher itself already exited.
+    kill -KILL -- -"$pid" 2>/dev/null || true
     exit 1
 fi

@@ -203,6 +203,10 @@ impl ProcessManager {
 
                 if let Err(err) = wait_server_ready(client, stopped.clone(), true).await {
                     log::error!("Failed to wait for qdrant to be ready: {err:?}");
+                    // std::process::exit() bypasses Drop, so kill_on_drop never fires.
+                    // Kill the qdrant child explicitly, otherwise it is orphaned and keeps
+                    // holding the inherited stdout/stderr pipe open (hangs the CI runner).
+                    let _ = self.child_process.kill().await;
                     exit(1);
                 }
 

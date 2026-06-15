@@ -27,6 +27,11 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Safety net: a hung/orphaned process must never burn the full 6h default.
+    # Derived from the (dynamic) crashing_time input: crashing_time (seconds) -> minutes,
+    # plus a 30 min buffer for build + snapshot-restore checks. Falls back to the 3600s
+    # default for push/schedule events, where the workflow_dispatch input is empty.
+    timeout-minutes: ${{ fromJSON(inputs.crashing_time || '3600') / 60 + 30 }}
     steps:
       - name: Free disk space
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # main

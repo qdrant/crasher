@@ -65,6 +65,10 @@ async fn main() {
                     if let Err(err) = wait_server_ready(&grpc_client, stopped.clone(), false).await
                     {
                         log::error!("Failed to wait for qdrant to be ready: {err:?}");
+                        // std::process::exit() bypasses Drop, so kill_on_drop never fires.
+                        // Kill the qdrant child explicitly, otherwise it is orphaned and keeps
+                        // holding the inherited stdout/stderr pipe open (hangs the CI runner).
+                        let _ = process_manager.child_process.kill().await;
                         exit(1)
                     }
                     log::info!(
