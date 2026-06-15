@@ -27,11 +27,6 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Safety net: a hung/orphaned process must never burn the full 6h default.
-    # Derived from the (dynamic) crashing_time input: crashing_time (seconds) -> minutes,
-    # plus a 30 min buffer for build + snapshot-restore checks. Falls back to the 3600s
-    # default for push/schedule events, where the workflow_dispatch input is empty.
-    timeout-minutes: ${{ fromJSON(inputs.crashing_time || '3600') / 60 + 30 }}
     steps:
       - name: Free disk space
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # main
@@ -66,10 +61,15 @@ jobs:
             points_count=5000
           fi
 
+          # Safety-net timeout for the crashing step: crashing_time (seconds) -> minutes
+          # plus a 30 min buffer. GitHub expressions can't do arithmetic, so compute here.
+          timeout_minutes=$(( crashing_time / 60 + 30 ))
+
           echo "qdrant_version=$qdrant_version" >> $GITHUB_OUTPUT
           echo "crashing_time=$crashing_time" >> $GITHUB_OUTPUT
           echo "crash_probability=$crash_probability" >> $GITHUB_OUTPUT
           echo "points_count=$points_count" >> $GITHUB_OUTPUT
+          echo "timeout_minutes=$timeout_minutes" >> $GITHUB_OUTPUT
       - name: Install minimal stable
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: Install mold
@@ -107,6 +107,9 @@ jobs:
       - name: Crash things
         working-directory: /home/runner/work/crasher/crasher
         shell: bash
+        # Safety net: a hung/orphaned process must never burn the full 6h default.
+        # Derived from the dynamic crashing_time input (see "Process inputs").
+        timeout-minutes: ${{ fromJSON(steps.default_inputs.outputs.timeout_minutes) }}
         run: |
           mkdir qdrant
           cp -r qdrant-src/config qdrant
