@@ -94,10 +94,12 @@ jobs:
       - name: Enable mold
         shell: bash
         run: |
+          # Use the default cc (gcc) driver with the -fuse-ld=mold keyword.
+          # gcc >= 12.1 (ubuntu-latest is 24.04) supports it, so no clang needed
+          # (clang would pull in a lot of LLVM and eat the disk we're saving).
           mkdir -p .cargo
           echo "[target.x86_64-unknown-linux-gnu]" >> .cargo/config.toml
-          echo "linker = \"clang\"" >> .cargo/config.toml
-          echo "rustflags = [\"-C\", \"link-arg=-fuse-ld=/usr/local/bin/mold\"]" >> .cargo/config.toml
+          echo "rustflags = [\"-C\", \"link-arg=-fuse-ld=mold\"]" >> .cargo/config.toml
       - name: Build Crasher (release)
         run: cargo build --release
       - name: Build Qdrant (debug)
