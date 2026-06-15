@@ -74,15 +74,6 @@ jobs:
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: Install mold
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - name: Enable mold on Linux
-        run: |
-          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
-            mkdir .cargo
-            echo "[target.x86_64-unknown-linux-gnu]" >> .cargo/config.toml
-            echo "linker = \"clang\"" >> .cargo/config.toml
-            echo "rustflags = [\"-C\", \"link-arg=-fuse-ld=/usr/local/bin/mold\"]" >> .cargo/config.toml
-          fi
-        shell: bash
       - name: Install Protoc
         uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
         with:
@@ -97,6 +88,16 @@ jobs:
           repository: qdrant/qdrant
           ref: ${{ steps.default_inputs.outputs.qdrant_version }}
           path: ./qdrant-src
+      # Write the mold linker config AFTER the crasher checkout: actions/checkout
+      # defaults to clean=true (git clean -ffdx) and would otherwise wipe .cargo/.
+      # Both builds pick it up since qdrant-src is a subdir of the workspace root.
+      - name: Enable mold
+        shell: bash
+        run: |
+          mkdir -p .cargo
+          echo "[target.x86_64-unknown-linux-gnu]" >> .cargo/config.toml
+          echo "linker = \"clang\"" >> .cargo/config.toml
+          echo "rustflags = [\"-C\", \"link-arg=-fuse-ld=/usr/local/bin/mold\"]" >> .cargo/config.toml
       - name: Build Crasher (release)
         run: cargo build --release
       - name: Build Qdrant (debug)
