@@ -261,21 +261,24 @@ const INDEXED_PAYLOAD_KEYS: &[&str] = &[
 /// points carry the payload, which matters because the check also runs after a crash that may have
 /// interrupted the set-payload phase. We deliberately do *not* assert the fully-set distribution
 /// (e.g. "exactly half are non-empty"), since a partially-applied set-payload is a valid recovered
-/// state. For every field we require:
+/// state.
 ///
-/// 1. all fields report an identical `non_empty` count, and
-/// 2. all fields report an identical `empty` count — they are set as a unit, so a per-field
-///    divergence is real index corruption, not benign lag; and
-/// 3. `non_empty + empty` is never *below* the point count — a deficit means points were lost from
-///    both buckets of a field's index. We do not cap the overshoot: `is_empty` and
-///    `must_not(is_empty)` are complements that should sum to the point count, but under
-///    copy-on-write `set_payload` copies a point from a non-appendable segment into an appendable
-///    one (new copy carries the value → `non_empty`) and retires the stale pre-set copy (empty →
-///    `empty`); after a crash that retirement can lag, double-counting the point until the
-///    optimizer's dedup pass scrubs it. That overshoot is benign and its size depends on how far
-///    dedup has progressed, so bounding it is just flakiness with no corruption-detecting value —
-///    the deficit half is the only sharp signal here. The exact cross-field agreement in (1)&(2)
-///    is what actually catches index corruption.
+/// For every field we require that `non_empty + empty` is never *below* the point count — a deficit
+/// means points were lost from both buckets of that field's index. The overshoot *above* the point
+/// count is left unbounded: under copy-on-write `set_payload` copies a point from a non-appendable
+/// segment into an appendable one (new copy carries the value → `non_empty`) and retires the stale
+/// pre-set copy (empty → `empty`); after a crash that retirement lags, double-counting the point in
+/// the filtered buckets until the optimizer's dedup pass scrubs it. `total_count` dedups by id and
+/// is stable across the check, so a per-field sum can only dip *below* it through genuine loss —
+/// that deficit is the sharp signal, and it holds even while dedup is mid-flight.
+///
+/// We previously also required every field to report an identical `empty` (and `non_empty`) count,
+/// on the theory that fields set as a unit must agree. That cross-field check is unsalvageable and
+/// has been dropped: the per-field counts are gathered via separate, non-atomic `count` RPCs while
+/// the background optimizer concurrently dedups, so the overshoot differs field-to-field purely by
+/// *when* each was measured — benign skew, not corruption — and there is no read-snapshot across
+/// count calls to remove it. Waiting for the optimizer to quiesce is not a fix either: it would
+/// check a healed state and mask the very recovery bugs this tool exists to catch.
 pub async fn check_payload_indexes_consistency(
     collection_name: &str,
     client: &Qdrant,
@@ -311,34 +314,10 @@ pub async fn check_payload_indexes_consistency(
 
     let mut errors: Vec<String> = Vec::new();
 
-    // (1) & (2) All fields are set as a unit, so they must agree on both counts. A per-field
-    // divergence is index corruption, not the uniform lag of copy-on-write deduplication.
-    let (_, first_non_empty, first_empty) = index_totals[0];
-    if index_totals.iter().any(|(_, ne, _)| *ne != first_non_empty) {
-        let listing = index_totals
-            .iter()
-            .map(|(name, ne, _)| format!("'{name}': non_empty({ne})"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        errors.push(format!(
-            "non_empty counts disagree across fields (must be identical): {listing}"
-        ));
-    }
-    if index_totals.iter().any(|(_, _, e)| *e != first_empty) {
-        let listing = index_totals
-            .iter()
-            .map(|(name, _, e)| format!("'{name}': empty({e})"))
-            .collect::<Vec<_>>()
-            .join(", ");
-        errors.push(format!(
-            "empty counts disagree across fields (must be identical): {listing}"
-        ));
-    }
-
-    // (3) non_empty + empty must never fall below the point count (points lost from both buckets of
-    // a field's index). The overshoot is left unbounded: it is benign copy-on-write residue whose
-    // size only reflects how far the optimizer's dedup pass has progressed, so capping it adds
-    // flakiness without catching corruption.
+    // non_empty + empty must never fall below the point count (points lost from both buckets of a
+    // field's index). The overshoot is left unbounded: it is benign copy-on-write residue whose
+    // size only reflects how far the optimizer's dedup pass has progressed, so capping it — or
+    // comparing it across fields — is just flakiness with no corruption-detecting value.
     for (name, non_empty, empty) in &index_totals {
         let sum = non_empty + empty;
         if sum < total_count {
