@@ -197,15 +197,69 @@ async fn copy_dir_impl(src: PathBuf, dst: PathBuf) -> anyhow::Result<()> {
         } else {
             let entry_path = entry.path();
 
-            fs::copy(&entry_path, &dst).await.with_context(|| {
-                format!(
-                    "failed to copy {} file to {}",
-                    entry_path.display(),
-                    dst.display()
-                )
-            })?;
+            // qdrant's storage holds large mmap files that are mostly holes. A plain
+            // fs::copy (copy_file_range) can materialize those holes as real zero
+            // blocks, doubling real disk usage and filling the CI runner. Copy with
+            // hole detection so the backup stays as sparse as the source.
+            let src = entry_path.clone();
+            let out = dst.clone();
+            tokio::task::spawn_blocking(move || copy_file_sparse(&src, &out))
+                .await
+                .with_context(|| format!("sparse-copy task for {} panicked", entry_path.display()))?
+                .with_context(|| {
+                    format!(
+                        "failed to sparse-copy {} file to {}",
+                        entry_path.display(),
+                        dst.display()
+                    )
+                })?;
         }
     }
+
+    Ok(())
+}
+
+/// Copy a single file while preserving sparseness: runs of zero bytes are left as
+/// holes in the destination instead of being written out. Mirrors the behaviour of
+/// `cp --sparse=always` and is filesystem-agnostic (it detects zeros rather than
+/// relying on the source reporting its holes).
+fn copy_file_sparse(src: &Path, dst: &Path) -> std::io::Result<()> {
+    use std::io::{Read as _, Seek as _, SeekFrom, Write as _};
+
+    // Block granularity for hole detection; matches a typical filesystem page run.
+    const BLOCK: usize = 64 * 1024;
+
+    let mut reader = std::fs::File::open(src)?;
+    let mut writer = std::fs::File::create(dst)?;
+
+    let mut buf = vec![0u8; BLOCK];
+    loop {
+        // Fill a full block (or until EOF); File::read may return short reads.
+        let mut filled = 0;
+        while filled < buf.len() {
+            match reader.read(&mut buf[filled..])? {
+                0 => break,
+                n => filled += n,
+            }
+        }
+        if filled == 0 {
+            break;
+        }
+
+        let chunk = &buf[..filled];
+        if chunk.iter().all(|&b| b == 0) {
+            // Leave a hole: just advance the write position. The region only
+            // becomes part of the file once a later write or set_len extends it.
+            writer.seek(SeekFrom::Current(filled as i64))?;
+        } else {
+            writer.write_all(chunk)?;
+        }
+    }
+
+    // Pin the exact length so a trailing hole (or an all-zero file) is preserved.
+    let meta = reader.metadata()?;
+    writer.set_len(meta.len())?;
+    writer.set_permissions(meta.permissions())?;
 
     Ok(())
 }

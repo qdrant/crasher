@@ -107,6 +107,19 @@ jobs:
         # disable deadlock detector until we sort out https://github.com/Amanieu/parking_lot/issues/489
         # run: cargo build --features "service_debug"
         run: cargo build
+      # Reclaim the qdrant build target before the run. The crash step only EXECUTES
+      # the prebuilt binary (target/debug/qdrant); the rest of target/ (deps,
+      # incremental, build scripts) is tens of GB of dead weight that would otherwise
+      # sit on disk while qdrant's storage grows. The disk is already maxed by
+      # free-disk-space, so freeing this fixed chunk is the only headroom left.
+      - name: Reclaim qdrant build target
+        working-directory: /home/runner/work/crasher/crasher/qdrant-src/target/debug
+        shell: bash
+        run: |
+          echo "Disk before reclaim:"; df -h .
+          # Keep only the qdrant binary (hardlinked from deps/, so its data survives).
+          find . -maxdepth 1 -mindepth 1 ! -name qdrant -exec rm -rf {} +
+          echo "Disk after reclaim:"; df -h .
       - name: Crash things
         working-directory: /home/runner/work/crasher/crasher
         shell: bash
