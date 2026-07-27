@@ -3,12 +3,12 @@ use core::option::Option;
 use core::option::Option::{None, Some};
 use qdrant_client::Payload;
 use qdrant_client::qdrant::r#match::MatchValue;
-use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::{
     BinaryQuantizationBuilder, BinaryQuantizationEncoding, Condition, Distance, Filter,
-    HnswConfigDiff, Memory, MultiVectorConfig, ProductQuantization, QuantizationConfig,
-    ScalarQuantization, SparseIndexConfig, SparseVectorParams, TurboQuantBitSize,
-    TurboQuantizationBuilder, VectorParams,
+    HnswConfigDiffBuilder, Memory, MultiVectorConfig, ProductQuantizationBuilder,
+    ScalarQuantizationBuilder, SparseIndexConfigBuilder, SparseVectorParams,
+    SparseVectorParamsBuilder, TurboQuantBitSize, TurboQuantizationBuilder, VectorParams,
+    VectorParamsBuilder,
 };
 use rand::{Rng, RngExt};
 use serde_json::json;
@@ -95,62 +95,37 @@ pub struct TestNamedVectors {
 
 // TODO unit test names
 impl TestNamedVectors {
-    // exhaustive struct literals must still name the deprecated `on_disk`/`always_ram` fields
-    #[allow(deprecated)]
     pub fn new(duplication_factor: u32, vec_dim: u32) -> Self {
         let mut sparse = BTreeMap::new();
         let mut dense = BTreeMap::new();
         let mut multi = BTreeMap::new();
 
-        let hnsw_config = Some(HnswConfigDiff {
-            m: Some(32),
-            ef_construct: None,
-            full_scan_threshold: None,
-            max_indexing_threads: None,
-            on_disk: None,
-            memory: Some(Memory::Cached.into()),
-            payload_m: None,
-            inline_storage: None,
-        });
+        let hnsw_config = HnswConfigDiffBuilder::default()
+            .m(32)
+            .memory(Memory::Cached)
+            .build();
 
-        let hnsw_config_on_disk = Some(HnswConfigDiff {
-            m: Some(32),
-            ef_construct: None,
-            full_scan_threshold: None,
-            max_indexing_threads: None,
-            on_disk: None,
-            memory: Some(Memory::Cold.into()),
-            payload_m: None,
-            inline_storage: None,
-        });
+        let hnsw_config_on_disk = HnswConfigDiffBuilder::default()
+            .m(32)
+            .memory(Memory::Cold)
+            .build();
 
         // warning: requires Quantization
-        let hnsw_config_inline_storage = Some(HnswConfigDiff {
-            m: Some(32),
-            ef_construct: None,
-            full_scan_threshold: None,
-            max_indexing_threads: None,
-            on_disk: None,
-            memory: Some(Memory::Cached.into()),
-            payload_m: None,
-            inline_storage: Some(true),
-        });
+        let hnsw_config_inline_storage = HnswConfigDiffBuilder::default()
+            .m(32)
+            .memory(Memory::Cached)
+            .inline_storage(true)
+            .build();
 
         // dense vectors mmap
         for i in 1..=duplication_factor {
             let name = format!("{DENSE_VECTOR_NAME_MMAP}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -159,16 +134,10 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .build(),
             );
         }
 
@@ -177,16 +146,11 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_UINT8}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: Some(2), // UInt8
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .datatype(2) // UInt8
+                    .build(),
             );
         }
 
@@ -195,16 +159,11 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_FLOAT16}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: Some(3), // Float16
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .datatype(3) // Float16
+                    .build(),
             );
         }
 
@@ -213,16 +172,11 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_TURBO4}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: Some(4), // Turbo4
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .datatype(4) // Turbo4
+                    .build(),
             );
         }
 
@@ -231,23 +185,11 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_SQ}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Scalar(ScalarQuantization {
-                            r#type: 1, // Int8
-                            quantile: None,
-                            always_ram: None,
-                            memory: None, // follow storage placement
-                        })),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(ScalarQuantizationBuilder::default())
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -256,22 +198,11 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_PQ}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Product(ProductQuantization {
-                            compression: 1, // x8
-                            always_ram: None,
-                            memory: None, // follow storage placement
-                        })),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(ProductQuantizationBuilder::new(1)) // x8
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -284,18 +215,11 @@ impl TestNamedVectors {
 
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Binary(bq_builder.build())),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(bq_builder)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -308,18 +232,11 @@ impl TestNamedVectors {
 
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Binary(bq_builder.build())),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(bq_builder)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -332,18 +249,11 @@ impl TestNamedVectors {
 
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Binary(bq_builder.build())),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(bq_builder)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -356,18 +266,11 @@ impl TestNamedVectors {
 
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Binary(bq_builder.build())),
-                    }),
-                    hnsw_config: hnsw_config_inline_storage,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(bq_builder)
+                    .hnsw_config(hnsw_config_inline_storage)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -376,16 +279,10 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_COSINE}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Cosine.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Cosine)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -394,16 +291,10 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_EUCLID}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Euclid.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Euclid)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -412,16 +303,10 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MANHATTAN}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Manhattan.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Manhattan)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -430,23 +315,11 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_SQ}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Scalar(ScalarQuantization {
-                            r#type: 1, // Int8
-                            quantile: None,
-                            always_ram: None,
-                            memory: None, // follow storage placement
-                        })),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(ScalarQuantizationBuilder::default())
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .build(),
             );
         }
 
@@ -455,22 +328,11 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_PQ}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Product(ProductQuantization {
-                            compression: 1, // x8
-                            always_ram: None,
-                            memory: None, // follow storage placement
-                        })),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(ProductQuantizationBuilder::new(1)) // x8
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .build(),
             );
         }
 
@@ -481,18 +343,11 @@ impl TestNamedVectors {
                 BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::OneBit);
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Binary(bq_builder.build())),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(bq_builder)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .build(),
             );
         }
 
@@ -503,18 +358,11 @@ impl TestNamedVectors {
                 .encoding(BinaryQuantizationEncoding::OneAndHalfBits);
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Binary(bq_builder.build())),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(bq_builder)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .build(),
             );
         }
 
@@ -525,18 +373,11 @@ impl TestNamedVectors {
                 BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::TwoBits);
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Binary(bq_builder.build())),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(bq_builder)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .build(),
             );
         }
 
@@ -545,16 +386,10 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_COSINE}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Cosine.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Cosine)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .build(),
             );
         }
 
@@ -563,16 +398,10 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_EUCLID}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Euclid.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Euclid)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .build(),
             );
         }
 
@@ -581,16 +410,10 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_MANHATTAN}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Manhattan.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Manhattan)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .build(),
             );
         }
 
@@ -599,16 +422,11 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_UINT8}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: Some(2), // UInt8
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .datatype(2) // UInt8
+                    .build(),
             );
         }
 
@@ -617,16 +435,11 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_FLOAT16}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: Some(3), // Float16
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .datatype(3) // Float16
+                    .build(),
             );
         }
 
@@ -635,16 +448,11 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_TURBO4}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: Some(4), // Turbo4
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .datatype(4) // Turbo4
+                    .build(),
             );
         }
 
@@ -653,16 +461,10 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_HNSW_ON_DISK}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config: hnsw_config_on_disk,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config_on_disk)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -671,22 +473,11 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_PQ_X16}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Product(ProductQuantization {
-                            compression: 2, // x16
-                            always_ram: None,
-                            memory: None, // follow storage placement
-                        })),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(ProductQuantizationBuilder::new(2)) // x16
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -699,43 +490,28 @@ impl TestNamedVectors {
                 .build();
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Turboquant(tq)),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(tq)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
-        // dense vectors SQ with quantile and always_ram
+        // dense vectors SQ with quantile and pinned memory
         for i in 1..=duplication_factor {
             let name = format!("{DENSE_VECTOR_NAME_SQ_RAM}-{i}");
             dense.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Scalar(ScalarQuantization {
-                            r#type: 1, // Int8
-                            quantile: Some(0.95),
-                            always_ram: None,
-                            memory: Some(Memory::Pinned.into()),
-                        })),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config: None,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(
+                        ScalarQuantizationBuilder::default()
+                            .quantile(0.95)
+                            .memory(Memory::Pinned),
+                    )
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .build(),
             );
         }
 
@@ -744,15 +520,9 @@ impl TestNamedVectors {
             let name = format!("{SPARSE_VECTOR_NAME_INDEX_DISK}-{i}");
             sparse.insert(
                 name.clone(),
-                SparseVectorParams {
-                    index: Some(SparseIndexConfig {
-                        full_scan_threshold: None,
-                        on_disk: None,
-                        memory: Some(Memory::Cold.into()),
-                        datatype: None,
-                    }),
-                    modifier: None,
-                },
+                SparseVectorParamsBuilder::default()
+                    .index(SparseIndexConfigBuilder::default().memory(Memory::Cold))
+                    .build(),
             );
         }
 
@@ -761,15 +531,9 @@ impl TestNamedVectors {
             let name = format!("{SPARSE_VECTOR_NAME_INDEX_MEMORY}-{i}");
             sparse.insert(
                 name.clone(),
-                SparseVectorParams {
-                    index: Some(SparseIndexConfig {
-                        full_scan_threshold: None,
-                        on_disk: None,
-                        memory: Some(Memory::Pinned.into()),
-                        datatype: None,
-                    }),
-                    modifier: None,
-                },
+                SparseVectorParamsBuilder::default()
+                    .index(SparseIndexConfigBuilder::default().memory(Memory::Pinned))
+                    .build(),
             );
         }
 
@@ -778,15 +542,13 @@ impl TestNamedVectors {
             let name = format!("{SPARSE_VECTOR_NAME_UINT8}-{i}");
             sparse.insert(
                 name.clone(),
-                SparseVectorParams {
-                    index: Some(SparseIndexConfig {
-                        full_scan_threshold: None,
-                        on_disk: None,
-                        memory: Some(Memory::Cold.into()),
-                        datatype: Some(2), // UInt8
-                    }),
-                    modifier: None,
-                },
+                SparseVectorParamsBuilder::default()
+                    .index(
+                        SparseIndexConfigBuilder::default()
+                            .memory(Memory::Cold)
+                            .datatype(2),
+                    ) // UInt8
+                    .build(),
             );
         }
 
@@ -795,15 +557,13 @@ impl TestNamedVectors {
             let name = format!("{SPARSE_VECTOR_NAME_FLOAT16}-{i}");
             sparse.insert(
                 name.clone(),
-                SparseVectorParams {
-                    index: Some(SparseIndexConfig {
-                        full_scan_threshold: None,
-                        on_disk: None,
-                        memory: Some(Memory::Cold.into()),
-                        datatype: Some(3), // Float16
-                    }),
-                    modifier: None,
-                },
+                SparseVectorParamsBuilder::default()
+                    .index(
+                        SparseIndexConfigBuilder::default()
+                            .memory(Memory::Cold)
+                            .datatype(3),
+                    ) // Float16
+                    .build(),
             );
         }
 
@@ -812,15 +572,14 @@ impl TestNamedVectors {
             let name = format!("{SPARSE_VECTOR_NAME_IDF}-{i}");
             sparse.insert(
                 name.clone(),
-                SparseVectorParams {
-                    index: Some(SparseIndexConfig {
-                        full_scan_threshold: None,
-                        on_disk: None,
-                        memory: Some(Memory::Cold.into()),
-                        datatype: Some(1), // Float32
-                    }),
-                    modifier: Some(2), // IDF
-                },
+                SparseVectorParamsBuilder::default()
+                    .index(
+                        SparseIndexConfigBuilder::default()
+                            .memory(Memory::Cold)
+                            .datatype(1),
+                    ) // Float32
+                    .modifier(2) // IDF
+                    .build(),
             );
         }
 
@@ -829,15 +588,13 @@ impl TestNamedVectors {
             let name = format!("{SPARSE_VECTOR_NAME_MEMORY_UINT8}-{i}");
             sparse.insert(
                 name.clone(),
-                SparseVectorParams {
-                    index: Some(SparseIndexConfig {
-                        full_scan_threshold: None,
-                        on_disk: None,
-                        memory: Some(Memory::Pinned.into()),
-                        datatype: Some(2), // UInt8
-                    }),
-                    modifier: None,
-                },
+                SparseVectorParamsBuilder::default()
+                    .index(
+                        SparseIndexConfigBuilder::default()
+                            .memory(Memory::Pinned)
+                            .datatype(2),
+                    ) // UInt8
+                    .build(),
             );
         }
 
@@ -846,15 +603,13 @@ impl TestNamedVectors {
             let name = format!("{SPARSE_VECTOR_NAME_MEMORY_FLOAT16}-{i}");
             sparse.insert(
                 name.clone(),
-                SparseVectorParams {
-                    index: Some(SparseIndexConfig {
-                        full_scan_threshold: None,
-                        on_disk: None,
-                        memory: Some(Memory::Pinned.into()),
-                        datatype: Some(3), // Float16
-                    }),
-                    modifier: None,
-                },
+                SparseVectorParamsBuilder::default()
+                    .index(
+                        SparseIndexConfigBuilder::default()
+                            .memory(Memory::Pinned)
+                            .datatype(3),
+                    ) // Float16
+                    .build(),
             );
         }
 
@@ -863,34 +618,28 @@ impl TestNamedVectors {
             let name = format!("{SPARSE_VECTOR_NAME_MEMORY_IDF}-{i}");
             sparse.insert(
                 name.clone(),
-                SparseVectorParams {
-                    index: Some(SparseIndexConfig {
-                        full_scan_threshold: None,
-                        on_disk: None,
-                        memory: Some(Memory::Pinned.into()),
-                        datatype: Some(1), // Float32
-                    }),
-                    modifier: Some(2), // IDF
-                },
+                SparseVectorParamsBuilder::default()
+                    .index(
+                        SparseIndexConfigBuilder::default()
+                            .memory(Memory::Pinned)
+                            .datatype(1),
+                    ) // Float32
+                    .modifier(2) // IDF
+                    .build(),
             );
         }
 
-        let multivector_config = Some(MultiVectorConfig { comparator: 0 });
+        let multivector_config = MultiVectorConfig { comparator: 0 };
         // multi vector mmap
         for i in 1..=duplication_factor {
             let name = format!("{MULTI_VECTOR_NAME_MMAP}-{i}");
             multi.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .multivector_config(multivector_config)
+                    .build(),
             );
         }
 
@@ -899,16 +648,11 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_MEMORY}-{i}");
             multi.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cached.into()),
-                    datatype: None,
-                    multivector_config,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cached)
+                    .multivector_config(multivector_config)
+                    .build(),
             );
         }
 
@@ -917,16 +661,12 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_UINT8}-{i}");
             multi.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: Some(2), // UInt8
-                    multivector_config,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .datatype(2) // UInt8
+                    .multivector_config(multivector_config)
+                    .build(),
             );
         }
 
@@ -935,16 +675,12 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_FLOAT16}-{i}");
             multi.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: None,
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: Some(3), // Float16
-                    multivector_config,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .datatype(3) // Float16
+                    .multivector_config(multivector_config)
+                    .build(),
             );
         }
 
@@ -953,23 +689,12 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_SQ}-{i}");
             multi.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Scalar(ScalarQuantization {
-                            r#type: 1, // Int8
-                            quantile: None,
-                            always_ram: None,
-                            memory: None, // follow storage placement
-                        })),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(ScalarQuantizationBuilder::default())
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .multivector_config(multivector_config)
+                    .build(),
             );
         }
 
@@ -978,22 +703,12 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_PQ}-{i}");
             multi.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Product(ProductQuantization {
-                            compression: 1, // x8
-                            always_ram: None,
-                            memory: None, // follow storage placement
-                        })),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(ProductQuantizationBuilder::new(1)) // x8
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .multivector_config(multivector_config)
+                    .build(),
             );
         }
 
@@ -1004,18 +719,12 @@ impl TestNamedVectors {
                 BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::TwoBits);
             multi.insert(
                 name,
-                VectorParams {
-                    size: vec_dim as u64,
-                    distance: Distance::Dot.into(),
-                    quantization_config: Some(QuantizationConfig {
-                        quantization: Some(Quantization::Binary(bq_builder.build())),
-                    }),
-                    hnsw_config,
-                    on_disk: None,
-                    memory: Some(Memory::Cold.into()),
-                    datatype: None,
-                    multivector_config,
-                },
+                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                    .quantization_config(bq_builder)
+                    .hnsw_config(hnsw_config)
+                    .memory(Memory::Cold)
+                    .multivector_config(multivector_config)
+                    .build(),
             );
         }
 
