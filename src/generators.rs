@@ -6,9 +6,9 @@ use qdrant_client::qdrant::r#match::MatchValue;
 use qdrant_client::qdrant::quantization_config::Quantization;
 use qdrant_client::qdrant::{
     BinaryQuantizationBuilder, BinaryQuantizationEncoding, Condition, Distance, Filter,
-    HnswConfigDiff, MultiVectorConfig, ProductQuantization, QuantizationConfig, ScalarQuantization,
-    SparseIndexConfig, SparseVectorParams, TurboQuantBitSize, TurboQuantizationBuilder,
-    VectorParams,
+    HnswConfigDiff, Memory, MultiVectorConfig, ProductQuantization, QuantizationConfig,
+    ScalarQuantization, SparseIndexConfig, SparseVectorParams, TurboQuantBitSize,
+    TurboQuantizationBuilder, VectorParams,
 };
 use rand::{Rng, RngExt};
 use serde_json::json;
@@ -95,6 +95,8 @@ pub struct TestNamedVectors {
 
 // TODO unit test names
 impl TestNamedVectors {
+    // exhaustive struct literals must still name the deprecated `on_disk`/`always_ram` fields
+    #[allow(deprecated)]
     pub fn new(duplication_factor: u32, vec_dim: u32) -> Self {
         let mut sparse = BTreeMap::new();
         let mut dense = BTreeMap::new();
@@ -105,7 +107,8 @@ impl TestNamedVectors {
             ef_construct: None,
             full_scan_threshold: None,
             max_indexing_threads: None,
-            on_disk: Some(false),
+            on_disk: None,
+            memory: Some(Memory::Cached.into()),
             payload_m: None,
             inline_storage: None,
         });
@@ -115,7 +118,8 @@ impl TestNamedVectors {
             ef_construct: None,
             full_scan_threshold: None,
             max_indexing_threads: None,
-            on_disk: Some(true),
+            on_disk: None,
+            memory: Some(Memory::Cold.into()),
             payload_m: None,
             inline_storage: None,
         });
@@ -126,7 +130,8 @@ impl TestNamedVectors {
             ef_construct: None,
             full_scan_threshold: None,
             max_indexing_threads: None,
-            on_disk: Some(false),
+            on_disk: None,
+            memory: Some(Memory::Cached.into()),
             payload_m: None,
             inline_storage: Some(true),
         });
@@ -141,7 +146,8 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -158,7 +164,8 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(false), // memory
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -175,8 +182,9 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // mmap
-                    datatype: Some(2),   // UInt8
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
+                    datatype: Some(2), // UInt8
                     multivector_config: None,
                 },
             );
@@ -192,8 +200,9 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // mmap
-                    datatype: Some(3),   // Float16
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
+                    datatype: Some(3), // Float16
                     multivector_config: None,
                 },
             );
@@ -209,8 +218,9 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // mmap
-                    datatype: Some(4),   // Turbo4
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
+                    datatype: Some(4), // Turbo4
                     multivector_config: None,
                 },
             );
@@ -228,11 +238,13 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Scalar(ScalarQuantization {
                             r#type: 1, // Int8
                             quantile: None,
-                            always_ram: Some(false),
+                            always_ram: None,
+                            memory: None, // follow storage placement
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -250,11 +262,13 @@ impl TestNamedVectors {
                     quantization_config: Some(QuantizationConfig {
                         quantization: Some(Quantization::Product(ProductQuantization {
                             compression: 1, // x8
-                            always_ram: Some(false),
+                            always_ram: None,
+                            memory: None, // follow storage placement
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -277,7 +291,8 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -300,7 +315,8 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -323,7 +339,8 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -346,7 +363,8 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config: hnsw_config_inline_storage,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -363,7 +381,8 @@ impl TestNamedVectors {
                     distance: Distance::Cosine.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true),
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -380,7 +399,8 @@ impl TestNamedVectors {
                     distance: Distance::Euclid.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true),
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -397,7 +417,8 @@ impl TestNamedVectors {
                     distance: Distance::Manhattan.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true),
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -416,11 +437,13 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Scalar(ScalarQuantization {
                             r#type: 1, // Int8
                             quantile: None,
-                            always_ram: Some(false),
+                            always_ram: None,
+                            memory: None, // follow storage placement
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(false), // memory
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -438,11 +461,13 @@ impl TestNamedVectors {
                     quantization_config: Some(QuantizationConfig {
                         quantization: Some(Quantization::Product(ProductQuantization {
                             compression: 1, // x8
-                            always_ram: Some(false),
+                            always_ram: None,
+                            memory: None, // follow storage placement
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(false), // memory
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -463,7 +488,8 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
-                    on_disk: Some(false), // memory
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -484,7 +510,8 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
-                    on_disk: Some(false), // memory
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -505,7 +532,8 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
-                    on_disk: Some(false), // memory
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -522,7 +550,8 @@ impl TestNamedVectors {
                     distance: Distance::Cosine.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(false), // memory
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -539,7 +568,8 @@ impl TestNamedVectors {
                     distance: Distance::Euclid.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(false), // memory
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -556,7 +586,8 @@ impl TestNamedVectors {
                     distance: Distance::Manhattan.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(false), // memory
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -573,8 +604,9 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(false), // memory
-                    datatype: Some(2),    // UInt8
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
+                    datatype: Some(2), // UInt8
                     multivector_config: None,
                 },
             );
@@ -590,8 +622,9 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(false), // memory
-                    datatype: Some(3),    // Float16
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
+                    datatype: Some(3), // Float16
                     multivector_config: None,
                 },
             );
@@ -607,8 +640,9 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(false), // memory
-                    datatype: Some(4),    // Turbo4
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
+                    datatype: Some(4), // Turbo4
                     multivector_config: None,
                 },
             );
@@ -624,7 +658,8 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config: hnsw_config_on_disk,
-                    on_disk: Some(true),
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -642,11 +677,13 @@ impl TestNamedVectors {
                     quantization_config: Some(QuantizationConfig {
                         quantization: Some(Quantization::Product(ProductQuantization {
                             compression: 2, // x16
-                            always_ram: Some(false),
+                            always_ram: None,
+                            memory: None, // follow storage placement
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(true),
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -669,7 +706,8 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Turboquant(tq)),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -688,11 +726,13 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Scalar(ScalarQuantization {
                             r#type: 1, // Int8
                             quantile: Some(0.95),
-                            always_ram: Some(true),
+                            always_ram: None,
+                            memory: Some(Memory::Pinned.into()),
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(true),
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config: None,
                 },
@@ -707,7 +747,8 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(true), // mmap
+                        on_disk: None,
+                        memory: Some(Memory::Cold.into()),
                         datatype: None,
                     }),
                     modifier: None,
@@ -723,7 +764,8 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(false), // in memory
+                        on_disk: None,
+                        memory: Some(Memory::Pinned.into()),
                         datatype: None,
                     }),
                     modifier: None,
@@ -739,8 +781,9 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(true), // mmap
-                        datatype: Some(2),   // UInt8
+                        on_disk: None,
+                        memory: Some(Memory::Cold.into()),
+                        datatype: Some(2), // UInt8
                     }),
                     modifier: None,
                 },
@@ -755,8 +798,9 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(true), // mmap
-                        datatype: Some(3),   // Float16
+                        on_disk: None,
+                        memory: Some(Memory::Cold.into()),
+                        datatype: Some(3), // Float16
                     }),
                     modifier: None,
                 },
@@ -771,8 +815,9 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(true), // mmap
-                        datatype: Some(1),   // Float32
+                        on_disk: None,
+                        memory: Some(Memory::Cold.into()),
+                        datatype: Some(1), // Float32
                     }),
                     modifier: Some(2), // IDF
                 },
@@ -787,8 +832,9 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(false), // in memory
-                        datatype: Some(2),    // UInt8
+                        on_disk: None,
+                        memory: Some(Memory::Pinned.into()),
+                        datatype: Some(2), // UInt8
                     }),
                     modifier: None,
                 },
@@ -803,8 +849,9 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(false), // in memory
-                        datatype: Some(3),    // Float16
+                        on_disk: None,
+                        memory: Some(Memory::Pinned.into()),
+                        datatype: Some(3), // Float16
                     }),
                     modifier: None,
                 },
@@ -819,8 +866,9 @@ impl TestNamedVectors {
                 SparseVectorParams {
                     index: Some(SparseIndexConfig {
                         full_scan_threshold: None,
-                        on_disk: Some(false), // in memory
-                        datatype: Some(1),    // Float32
+                        on_disk: None,
+                        memory: Some(Memory::Pinned.into()),
+                        datatype: Some(1), // Float32
                     }),
                     modifier: Some(2), // IDF
                 },
@@ -838,7 +886,8 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config,
                 },
@@ -855,7 +904,8 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(false), // memory
+                    on_disk: None,
+                    memory: Some(Memory::Cached.into()),
                     datatype: None,
                     multivector_config,
                 },
@@ -872,8 +922,9 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // mmap
-                    datatype: Some(2),   // UInt8
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
+                    datatype: Some(2), // UInt8
                     multivector_config,
                 },
             );
@@ -889,8 +940,9 @@ impl TestNamedVectors {
                     distance: Distance::Dot.into(),
                     quantization_config: None,
                     hnsw_config,
-                    on_disk: Some(true), // mmap
-                    datatype: Some(3),   // Float16
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
+                    datatype: Some(3), // Float16
                     multivector_config,
                 },
             );
@@ -908,11 +960,13 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Scalar(ScalarQuantization {
                             r#type: 1, // Int8
                             quantile: None,
-                            always_ram: Some(false),
+                            always_ram: None,
+                            memory: None, // follow storage placement
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config,
                 },
@@ -930,11 +984,13 @@ impl TestNamedVectors {
                     quantization_config: Some(QuantizationConfig {
                         quantization: Some(Quantization::Product(ProductQuantization {
                             compression: 1, // x8
-                            always_ram: Some(false),
+                            always_ram: None,
+                            memory: None, // follow storage placement
                         })),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config,
                 },
@@ -955,7 +1011,8 @@ impl TestNamedVectors {
                         quantization: Some(Quantization::Binary(bq_builder.build())),
                     }),
                     hnsw_config,
-                    on_disk: Some(true), // mmap
+                    on_disk: None,
+                    memory: Some(Memory::Cold.into()),
                     datatype: None,
                     multivector_config,
                 },
