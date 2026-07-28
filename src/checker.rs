@@ -79,9 +79,10 @@ pub async fn check_points_consistency(
                             }
                         }
                         for (name, vector) in &named_vectors.vectors {
-                            if check_zeroed_vector(vector) {
+                            if let Some(anomaly) = vector_anomaly(vector) {
                                 malformed_points_errors.push(format!(
-                                    "Vector {name} with id {point_id:?} is zeroed"
+                                    "Vector {name} with id {point_id:?} is {}",
+                                    anomaly.describe()
                                 ));
                             }
                         }
@@ -465,23 +466,64 @@ pub async fn check_count_scroll_parity(
     }
 }
 
-/// Checks if this is a zeroed vector.
-pub fn check_zeroed_vector(vector: &VectorOutput) -> bool {
-    vector
-        .vector
-        .as_ref()
-        .map(|vector| match vector {
-            vector_output::Vector::Dense(dense_vector) => {
-                dense_vector.data.iter().all(|v| *v == 0.0)
+/// Anomaly detected on a returned vector.
+///
+/// The two cases point at different failure modes and must not be conflated:
+/// `Empty` means the storage returned no data at all for the vector (lost data),
+/// `Zeroed` means data is present but every value is zero (corrupted values).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VectorAnomaly {
+    Empty,
+    Zeroed,
+}
+
+impl VectorAnomaly {
+    pub fn describe(&self) -> &'static str {
+        match self {
+            VectorAnomaly::Empty => "empty (no data returned)",
+            VectorAnomaly::Zeroed => "zeroed (all values are 0.0)",
+        }
+    }
+}
+
+/// Checks a returned vector for anomalies (empty or all-zero data).
+pub fn vector_anomaly(vector: &VectorOutput) -> Option<VectorAnomaly> {
+    // A `None` variant means the data sits in the deprecated legacy fields; not flagged.
+    match vector.vector.as_ref()? {
+        vector_output::Vector::Dense(dense_vector) => {
+            if dense_vector.data.is_empty() {
+                Some(VectorAnomaly::Empty)
+            } else if dense_vector.data.iter().all(|v| *v == 0.0) {
+                Some(VectorAnomaly::Zeroed)
+            } else {
+                None
             }
-            vector_output::Vector::Sparse(sparse_vector) => sparse_vector.indices.is_empty(),
-            vector_output::Vector::MultiDense(multi_dense_vector) => multi_dense_vector
+        }
+        // All-zero sparse values are not flagged: with the uint8 datatype small
+        // values legitimately quantize to zero. Only a missing index list is anomalous.
+        vector_output::Vector::Sparse(sparse_vector) => sparse_vector
+            .indices
+            .is_empty()
+            .then_some(VectorAnomaly::Empty),
+        vector_output::Vector::MultiDense(multi_dense_vector) => {
+            let value_count: usize = multi_dense_vector
                 .vectors
                 .iter()
-                .all(|v| v.data.iter().all(|v| *v == 0.0)),
-        })
-        // else, check the deprecated field
-        .unwrap_or_else(|| false)
+                .map(|v| v.data.len())
+                .sum();
+            if value_count == 0 {
+                Some(VectorAnomaly::Empty)
+            } else if multi_dense_vector
+                .vectors
+                .iter()
+                .all(|v| v.data.iter().all(|v| *v == 0.0))
+            {
+                Some(VectorAnomaly::Zeroed)
+            } else {
+                None
+            }
+        }
+    }
 }
 
 pub async fn check_optimizer_status(
@@ -502,7 +544,7 @@ pub async fn check_optimizer_status(
 
 /// Sanity-check a batched query response.
 ///
-/// Per scored point: score must be finite, returned vectors must not be all-zero.
+/// Per scored point: score must be finite, returned vectors must not be empty or all-zero.
 /// Per per-query result: scores must be monotonic (either non-increasing or non-decreasing) —
 /// the direction is not asserted because the workload mixes Cosine/Dot (higher = better)
 /// and Euclid/Manhattan (lower = better) named vectors. Both directions are valid; what's
@@ -519,25 +561,27 @@ pub fn check_search_result(results: &QueryBatchResponse) -> Result<(), CrasherEr
                     point.score, point.id,
                 ));
             }
-            // zeroed vectors
+            // empty or zeroed vectors
             if let Some(vectors) = point
                 .vectors
                 .as_ref()
                 .and_then(|v| v.vectors_options.as_ref())
             {
-                let zeroed_vector = match vectors {
+                let anomalous_vector = match vectors {
                     VectorsOptions::Vector(v) => {
-                        check_zeroed_vector(v).then_some((String::new(), v))
+                        vector_anomaly(v).map(|anomaly| (String::new(), anomaly, v))
                     }
-                    VectorsOptions::Vectors(vectors) => vectors
-                        .vectors
-                        .iter()
-                        .find_map(|(name, v)| check_zeroed_vector(v).then_some((name.clone(), v))),
+                    VectorsOptions::Vectors(vectors) => {
+                        vectors.vectors.iter().find_map(|(name, v)| {
+                            vector_anomaly(v).map(|anomaly| (name.clone(), anomaly, v))
+                        })
+                    }
                 };
-                if let Some((name, vector)) = zeroed_vector {
+                if let Some((name, anomaly, vector)) = anomalous_vector {
                     errors.push(format!(
-                        "query #{query_idx} rank #{rank}: zeroed vector '{name}' on point {:?}: {vector:?}",
+                        "query #{query_idx} rank #{rank}: vector '{name}' on point {:?} is {}: {vector:?}",
                         point.id,
+                        anomaly.describe(),
                     ));
                 }
             }
@@ -563,5 +607,90 @@ pub fn check_search_result(results: &QueryBatchResponse) -> Result<(), CrasherEr
             "Search result violations:\n{}",
             errors.join("\n"),
         )))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use qdrant_client::qdrant::{DenseVector, MultiDenseVector, SparseVector};
+
+    fn output(vector: vector_output::Vector) -> VectorOutput {
+        VectorOutput {
+            vector: Some(vector),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn dense_vector_anomaly() {
+        let empty = output(vector_output::Vector::Dense(DenseVector { data: vec![] }));
+        assert_eq!(vector_anomaly(&empty), Some(VectorAnomaly::Empty));
+
+        let zeroed = output(vector_output::Vector::Dense(DenseVector {
+            data: vec![0.0, 0.0],
+        }));
+        assert_eq!(vector_anomaly(&zeroed), Some(VectorAnomaly::Zeroed));
+
+        let healthy = output(vector_output::Vector::Dense(DenseVector {
+            data: vec![0.0, 1.5],
+        }));
+        assert_eq!(vector_anomaly(&healthy), None);
+    }
+
+    #[test]
+    fn sparse_vector_anomaly() {
+        let empty = output(vector_output::Vector::Sparse(SparseVector {
+            values: vec![],
+            indices: vec![],
+        }));
+        assert_eq!(vector_anomaly(&empty), Some(VectorAnomaly::Empty));
+
+        // all-zero sparse values are legitimate (uint8 quantization), not an anomaly
+        let zero_values = output(vector_output::Vector::Sparse(SparseVector {
+            values: vec![0.0, 0.0],
+            indices: vec![1, 2],
+        }));
+        assert_eq!(vector_anomaly(&zero_values), None);
+    }
+
+    #[test]
+    fn multi_dense_vector_anomaly() {
+        let no_vectors = output(vector_output::Vector::MultiDense(MultiDenseVector {
+            vectors: vec![],
+        }));
+        assert_eq!(vector_anomaly(&no_vectors), Some(VectorAnomaly::Empty));
+
+        let empty_sub_vectors = output(vector_output::Vector::MultiDense(MultiDenseVector {
+            vectors: vec![DenseVector { data: vec![] }, DenseVector { data: vec![] }],
+        }));
+        assert_eq!(
+            vector_anomaly(&empty_sub_vectors),
+            Some(VectorAnomaly::Empty)
+        );
+
+        let zeroed = output(vector_output::Vector::MultiDense(MultiDenseVector {
+            vectors: vec![
+                DenseVector { data: vec![0.0] },
+                DenseVector {
+                    data: vec![0.0, 0.0],
+                },
+            ],
+        }));
+        assert_eq!(vector_anomaly(&zeroed), Some(VectorAnomaly::Zeroed));
+
+        let healthy = output(vector_output::Vector::MultiDense(MultiDenseVector {
+            vectors: vec![
+                DenseVector { data: vec![] },
+                DenseVector { data: vec![2.0] },
+            ],
+        }));
+        assert_eq!(vector_anomaly(&healthy), None);
+    }
+
+    #[test]
+    fn legacy_encoding_not_flagged() {
+        let legacy = VectorOutput::default();
+        assert_eq!(vector_anomaly(&legacy), None);
     }
 }
