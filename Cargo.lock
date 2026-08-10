@@ -1440,8 +1440,9 @@ dependencies = [
 
 [[package]]
 name = "qdrant-client"
-version = "1.16.1-dev"
-source = "git+https://github.com/qdrant/rust-client?branch=dev#738227709dab2a6473f3d60cc845bf2313f9dfea"
+version = "1.19.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dddc19df129bad7346ebd027288621ab1ac7e52678371f906b9a8622d7aaf87e"
 dependencies = [
  "anyhow",
  "derive_builder",
