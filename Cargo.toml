@@ -29,6 +29,35 @@ reqwest = { version = "0.13.4", features = ["json"] } # for snapshot restore
 ahash = "0.8.12"
 nix = { version = "0.31.3", features = ["fs"] }
 
+[lints]
+workspace = true
+
+[workspace.lints.clippy]
+cast_lossless = "warn"
+doc_link_with_quotes = "warn"
+enum_glob_use = "warn"
+explicit_into_iter_loop = "warn"
+filter_map_next = "warn"
+flat_map_option = "warn"
+from_iter_instead_of_collect = "warn"
+implicit_clone = "warn"
+inconsistent_struct_constructor = "warn"
+inefficient_to_string = "warn"
+manual_is_variant_and = "warn"
+manual_let_else = "warn"
+needless_continue = "warn"
+needless_raw_string_hashes = "warn"
+ptr_as_ptr = "warn"
+ref_option_ref = "warn"
+uninlined_format_args = "warn"
+unnecessary_wraps = "warn"
+unused_self = "warn"
+used_underscore_binding = "warn"
+match_wildcard_for_single_variants = "warn"
+needless_pass_by_ref_mut = "warn"
+unused_async = "warn"
+wildcard_enum_match_arm = "warn"
+
 [profile.release]
 lto = "fat"
 codegen-units = 1

@@ -332,10 +332,10 @@ pub async fn create_collection(
         .optimizers_config(OptimizersConfigDiff {
             deleted_threshold: None,
             vacuum_min_vector_number: None,
-            default_segment_number: Some(args.segment_count as u64), // to force constant merges
-            indexing_threshold: args.indexing_threshold.map(|i| i as u64),
-            flush_interval_sec: Some(args.flush_interval_sec as u64),
-            memmap_threshold: args.memmap_threshold.map(|i| i as u64),
+            default_segment_number: Some(u64::from(args.segment_count)), // to force constant merges
+            indexing_threshold: args.indexing_threshold.map(u64::from),
+            flush_interval_sec: Some(u64::from(args.flush_interval_sec)),
+            memmap_threshold: args.memmap_threshold.map(u64::from),
             max_segment_size: None,
             max_optimization_threads: None,
             deprecated_max_optimization_threads: None,
@@ -391,9 +391,9 @@ pub async fn insert_points_batch(
             (false, batch_size)
         };
         let mut points = Vec::with_capacity(batch_size as usize);
-        let batch_base_id = batch_id as u64 * max_batch_size as u64;
+        let batch_base_id = u64::from(batch_id) * u64::from(max_batch_size);
         for i in 0..batch_size {
-            let idx = batch_base_id + i as u64;
+            let idx = batch_base_id + u64::from(i);
             let point_id = PointId {
                 point_id_options: Some(PointIdOptions::Num(idx)),
             };
@@ -721,7 +721,7 @@ pub async fn create_ephemeral_named_vector(
             CreateVectorNameRequestBuilder::new(
                 collection_name,
                 vector_name,
-                DenseVectorCreationConfigBuilder::new(vec_dim as u64, Distance::Dot),
+                DenseVectorCreationConfigBuilder::new(u64::from(vec_dim), Distance::Dot),
             )
             .wait(true),
         )

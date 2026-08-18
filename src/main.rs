@@ -108,7 +108,7 @@ async fn main() {
                                 stopped,
                                 crash_lock,
                                 &grpc_client,
-                                crash_probability as f64,
+                                f64::from(crash_probability),
                                 sleep_duration_between_crash_sec,
                                 &mut chaos_rng,
                             )

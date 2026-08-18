@@ -47,16 +47,14 @@ pub async fn storage_report(root: &Path) -> StorageReport {
     let mut stack: Vec<(PathBuf, &'static str, Option<String>)> =
         vec![(root.to_path_buf(), "other", None)];
     while let Some((dir, inherited_tag, shard)) = stack.pop() {
-        let mut entries = match fs::read_dir(&dir).await {
-            Ok(e) => e,
-            Err(_) => continue,
+        let Ok(mut entries) = fs::read_dir(&dir).await else {
+            continue;
         };
         while let Ok(Some(entry)) = entries.next_entry().await {
             let name = entry.file_name().to_string_lossy().into_owned();
             let child_path = entry.path();
-            let ft = match entry.file_type().await {
-                Ok(t) => t,
-                Err(_) => continue,
+            let Ok(ft) = entry.file_type().await else {
+                continue;
             };
             if ft.is_dir() {
                 let next_tag = classify(&name, inherited_tag);

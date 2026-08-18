@@ -122,7 +122,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MMAP}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
                     .build(),
@@ -134,7 +134,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
                     .build(),
@@ -146,7 +146,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_UINT8}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
                     .datatype(2) // UInt8
@@ -159,7 +159,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_FLOAT16}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
                     .datatype(3) // Float16
@@ -172,7 +172,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_TURBO4}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
                     .datatype(4) // Turbo4
@@ -185,7 +185,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_SQ}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(ScalarQuantizationBuilder::default())
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
@@ -198,7 +198,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_PQ}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(ProductQuantizationBuilder::new(1)) // x8
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
@@ -215,7 +215,7 @@ impl TestNamedVectors {
 
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(bq_builder)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
@@ -232,7 +232,7 @@ impl TestNamedVectors {
 
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(bq_builder)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
@@ -249,7 +249,7 @@ impl TestNamedVectors {
 
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(bq_builder)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
@@ -266,7 +266,7 @@ impl TestNamedVectors {
 
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(bq_builder)
                     .hnsw_config(hnsw_config_inline_storage)
                     .memory(Memory::Cold)
@@ -279,7 +279,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_COSINE}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Cosine)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Cosine)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
                     .build(),
@@ -291,7 +291,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_EUCLID}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Euclid)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Euclid)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
                     .build(),
@@ -303,7 +303,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MANHATTAN}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Manhattan)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Manhattan)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
                     .build(),
@@ -315,7 +315,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_SQ}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(ScalarQuantizationBuilder::default())
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
@@ -328,7 +328,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_PQ}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(ProductQuantizationBuilder::new(1)) // x8
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
@@ -343,7 +343,7 @@ impl TestNamedVectors {
                 BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::OneBit);
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(bq_builder)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
@@ -358,7 +358,7 @@ impl TestNamedVectors {
                 .encoding(BinaryQuantizationEncoding::OneAndHalfBits);
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(bq_builder)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
@@ -373,7 +373,7 @@ impl TestNamedVectors {
                 BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::TwoBits);
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(bq_builder)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
@@ -386,7 +386,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_COSINE}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Cosine)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Cosine)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
                     .build(),
@@ -398,7 +398,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_EUCLID}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Euclid)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Euclid)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
                     .build(),
@@ -410,7 +410,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_MANHATTAN}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Manhattan)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Manhattan)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
                     .build(),
@@ -422,7 +422,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_UINT8}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
                     .datatype(2) // UInt8
@@ -435,7 +435,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_FLOAT16}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
                     .datatype(3) // Float16
@@ -448,7 +448,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_MEMORY_TURBO4}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
                     .datatype(4) // Turbo4
@@ -461,7 +461,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_HNSW_ON_DISK}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config_on_disk)
                     .memory(Memory::Cold)
                     .build(),
@@ -473,7 +473,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_PQ_X16}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(ProductQuantizationBuilder::new(2)) // x16
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
@@ -490,7 +490,7 @@ impl TestNamedVectors {
                 .build();
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(tq)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
@@ -503,7 +503,7 @@ impl TestNamedVectors {
             let name = format!("{DENSE_VECTOR_NAME_SQ_RAM}-{i}");
             dense.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(
                         ScalarQuantizationBuilder::default()
                             .quantile(0.95)
@@ -635,7 +635,7 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_MMAP}-{i}");
             multi.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
                     .multivector_config(multivector_config)
@@ -648,7 +648,7 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_MEMORY}-{i}");
             multi.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cached)
                     .multivector_config(multivector_config)
@@ -661,7 +661,7 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_UINT8}-{i}");
             multi.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
                     .datatype(2) // UInt8
@@ -675,7 +675,7 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_FLOAT16}-{i}");
             multi.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
                     .datatype(3) // Float16
@@ -689,7 +689,7 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_SQ}-{i}");
             multi.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(ScalarQuantizationBuilder::default())
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
@@ -703,7 +703,7 @@ impl TestNamedVectors {
             let name = format!("{MULTI_VECTOR_NAME_PQ}-{i}");
             multi.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(ProductQuantizationBuilder::new(1)) // x8
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
@@ -719,7 +719,7 @@ impl TestNamedVectors {
                 BinaryQuantizationBuilder::new(false).encoding(BinaryQuantizationEncoding::TwoBits);
             multi.insert(
                 name,
-                VectorParamsBuilder::new(vec_dim as u64, Distance::Dot)
+                VectorParamsBuilder::new(u64::from(vec_dim), Distance::Dot)
                     .quantization_config(bq_builder)
                     .hnsw_config(hnsw_config)
                     .memory(Memory::Cold)
@@ -883,7 +883,7 @@ pub fn random_sparse_vector(rng: &mut impl Rng, max_size: u32, sparsity: f32) ->
     let mut pairs = Vec::with_capacity(size as usize);
     for i in 1..=size {
         // probability of skipping a dimension to make the vectors sparse
-        let skip = !rng.random_bool(sparsity as f64);
+        let skip = !rng.random_bool(f64::from(sparsity));
         if skip {
             continue;
         }

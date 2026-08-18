@@ -272,7 +272,7 @@ impl Workload {
             set_payload(
                 client,
                 &self.collection_name,
-                point_id as u64,
+                u64::from(point_id),
                 self.payload_count,
                 self.write_ordering,
                 rng,
@@ -350,7 +350,7 @@ impl Workload {
             &self.collection_name,
             client,
             current_count,
-            self.points_count as u64,
+            u64::from(self.points_count),
             &expected_names,
         )
         .await

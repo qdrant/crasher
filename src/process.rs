@@ -213,7 +213,10 @@ impl ProcessManager {
                 log::info!("Qdrant is ready!");
             }
             // wait a bit before next chaos
-            sleep(Duration::from_secs(sleep_duration_between_crash_sec as u64)).await;
+            sleep(Duration::from_secs(u64::from(
+                sleep_duration_between_crash_sec,
+            )))
+            .await;
         }
     }
 }
