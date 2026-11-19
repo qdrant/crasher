@@ -20,6 +20,7 @@ pub fn start_process(
     kill_on_drop: bool, // kill child process if parent is dropped
     cpu_quota: Option<u32>,
     async_io: bool,
+    serverless_compatible: bool,
 ) -> io::Result<Child> {
     let mut cmd = if let Some(cpu_quota) = cpu_quota {
         let mut c = Command::new("systemd-run");
@@ -36,6 +37,10 @@ pub fn start_process(
 
     if async_io {
         cmd.env("QDRANT__STORAGE__PERFORMANCE__ASYNC_SCORER", "true");
+    }
+
+    if serverless_compatible {
+        cmd.env("QDRANT__FEATURE_FLAGS__SERVERLESS_COMPATIBLE", "true");
     }
 
     cmd.current_dir(working_dir_path)
@@ -60,6 +65,7 @@ pub struct ProcessManager {
     pub kill_on_drop: bool,
     pub cpu_quota: Option<u32>,
     pub async_io: bool,
+    pub serverless_compatible: bool,
 }
 
 impl ProcessManager {
@@ -70,6 +76,7 @@ impl ProcessManager {
             args.shutdown_on_error,
             args.cpu_quota,
             args.async_io,
+            args.serverless_compatible,
         )?;
 
         if let Some(storage_backup) = &args.storage_backup {
@@ -85,8 +92,16 @@ impl ProcessManager {
         kill_on_drop: bool,
         cpu_quota: Option<u32>,
         async_io: bool,
+        serverless_compatible: bool,
     ) -> io::Result<Self> {
-        let child = start_process(working_dir, binary_path, kill_on_drop, cpu_quota, async_io)?;
+        let child = start_process(
+            working_dir,
+            binary_path,
+            kill_on_drop,
+            cpu_quota,
+            async_io,
+            serverless_compatible,
+        )?;
 
         Ok(Self {
             working_dir: working_dir.to_string(),
@@ -96,6 +111,7 @@ impl ProcessManager {
             kill_on_drop,
             cpu_quota,
             async_io,
+            serverless_compatible,
         })
     }
 
@@ -198,6 +214,7 @@ impl ProcessManager {
                     self.kill_on_drop,
                     self.cpu_quota,
                     self.async_io,
+                    self.serverless_compatible,
                 )
                 .unwrap();
 

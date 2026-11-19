@@ -85,4 +85,8 @@ pub struct Args {
     /// Whether to enable io_uring async IO in Qdrant
     #[arg(long, default_value_t = false)]
     pub async_io: bool,
+    /// Whether to enable Qdrant's `serverless_compatible` feature-flag bundle
+    /// (implies append-only storages/mutations, segment manifest, versioned deletes, ...)
+    #[arg(long, default_value_t = false)]
+    pub serverless_compatible: bool,
 }
