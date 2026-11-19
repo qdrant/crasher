@@ -8,6 +8,8 @@ CRASH_PROBABILITY=${3:-0.3}
 RUN_TIME=${4:-300}
 POINTS_COUNT=${5:-5000}
 QDRANT_BACKUP_DIR=${6:?backup directory is required}
+# Set SERVERLESS_COMPATIBLE=true to enable Qdrant's serverless_compatible feature-flag bundle
+SERVERLESS_COMPATIBLE=${SERVERLESS_COMPATIBLE:-false}
 
 CRASHER_LOG=crasher.log
 QDRANT_LOG=../qdrant.log
@@ -22,6 +24,10 @@ CRASHER_CMD=(
     --points-count "$POINTS_COUNT"
     --async-io
 )
+
+if [ "$SERVERLESS_COMPATIBLE" = "true" ]; then
+    CRASHER_CMD+=(--serverless-compatible)
+fi
 
 echo "${CRASHER_CMD[*]}"
 

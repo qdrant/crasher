@@ -20,6 +20,10 @@ on:
       points_count:
         description: "Number of points to insert"
         default: 5000
+      serverless_compatible:
+        description: "Enable Qdrant's serverless_compatible feature-flag bundle"
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -61,6 +65,11 @@ jobs:
             points_count=5000
           fi
 
+          serverless_compatible="${{ inputs.serverless_compatible }}"
+          if [ "$serverless_compatible" != "true" ]; then
+            serverless_compatible=false
+          fi
+
           # Safety-net timeout for the crashing step: crashing_time (seconds) -> minutes
           # plus a 30 min buffer. GitHub expressions can't do arithmetic, so compute here.
           timeout_minutes=$(( crashing_time / 60 + 30 ))
@@ -70,6 +79,7 @@ jobs:
           echo "crash_probability=$crash_probability" >> $GITHUB_OUTPUT
           echo "points_count=$points_count" >> $GITHUB_OUTPUT
           echo "timeout_minutes=$timeout_minutes" >> $GITHUB_OUTPUT
+          echo "serverless_compatible=$serverless_compatible" >> $GITHUB_OUTPUT
       - name: Install minimal stable
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: Install mold
@@ -134,6 +144,8 @@ jobs:
           crash_probability="${{ steps.default_inputs.outputs.crash_probability }}"
           points_count="${{ steps.default_inputs.outputs.points_count }}"
           backup_storage_dir="${{ format('{0}/qdrant/storage-backup', github.workspace) }}"
+
+          export SERVERLESS_COMPATIBLE="${{ steps.default_inputs.outputs.serverless_compatible }}"
 
           ./crash-things.sh qdrant ../qdrant-src/target/debug/qdrant "$crash_probability" "$crashing_time" "$points_count" "$backup_storage_dir"
       - name: Upload logs
