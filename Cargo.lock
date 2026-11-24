@@ -388,6 +388,8 @@ dependencies = [
  "ctrlc",
  "env_logger",
  "futures",
+ "hyper",
+ "hyper-util",
  "log",
  "nix",
  "qdrant-client",
