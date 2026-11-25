@@ -4,8 +4,10 @@ on:
   push:
     branches: [ "*" ]
   schedule:
-    # every day at 12 CET
+    # every day at 14:00 UTC (default mode)
     - cron: "0 14 * * *"
+    # every day at 17:00 UTC (serverless_compatible mode)
+    - cron: "0 17 * * *"
   workflow_dispatch:
     inputs:
       qdrant_version:
@@ -66,8 +68,18 @@ jobs:
           fi
 
           serverless_compatible="${{ inputs.serverless_compatible }}"
+          # Scheduled runs have no inputs: the second daily cron runs in serverless mode
+          if [ "${{ github.event.schedule }}" = "0 17 * * *" ]; then
+            serverless_compatible=true
+          fi
           if [ "$serverless_compatible" != "true" ]; then
             serverless_compatible=false
+          fi
+
+          if [ "$serverless_compatible" = "true" ]; then
+            mode_label=" (serverless)"
+          else
+            mode_label=""
           fi
 
           # Safety-net timeout for the crashing step: crashing_time (seconds) -> minutes
@@ -80,6 +92,7 @@ jobs:
           echo "points_count=$points_count" >> $GITHUB_OUTPUT
           echo "timeout_minutes=$timeout_minutes" >> $GITHUB_OUTPUT
           echo "serverless_compatible=$serverless_compatible" >> $GITHUB_OUTPUT
+          echo "mode_label=$mode_label" >> $GITHUB_OUTPUT
       - name: Install minimal stable
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: Install mold
@@ -181,13 +194,13 @@ jobs:
           webhook-type: incoming-webhook
           payload: |
             {
-              "text": "Crasher run status: ${{ job.status }}",
+              "text": "Crasher run status${{ steps.default_inputs.outputs.mode_label }}: ${{ job.status }}",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Something is wrong.\nView the results <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|here>"
+                    "text": "Something is wrong${{ steps.default_inputs.outputs.mode_label }}.\nView the results <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|here>"
                   }
                 }
               ]
