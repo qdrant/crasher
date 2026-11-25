@@ -3,9 +3,6 @@ name: Crash
 on:
   push:
     branches: [ "*" ]
-  schedule:
-    # every day at 12 CET
-    - cron: "0 14 * * *"
   workflow_dispatch:
     inputs:
       qdrant_version:
@@ -22,6 +19,24 @@ on:
         default: 5000
       serverless_compatible:
         description: "Enable Qdrant's serverless_compatible feature-flag bundle"
+        type: boolean
+        default: false
+  # Called by the scheduled-*.yml workflows, which own the cron schedules
+  workflow_call:
+    inputs:
+      qdrant_version:
+        type: string
+        default: dev
+      crashing_time:
+        type: string
+        default: "3600"
+      crash_probability:
+        type: string
+        default: "0.3"
+      points_count:
+        type: string
+        default: "5000"
+      serverless_compatible:
         type: boolean
         default: false
 
@@ -70,6 +85,12 @@ jobs:
             serverless_compatible=false
           fi
 
+          if [ "$serverless_compatible" = "true" ]; then
+            mode_label=" (serverless)"
+          else
+            mode_label=""
+          fi
+
           # Safety-net timeout for the crashing step: crashing_time (seconds) -> minutes
           # plus a 30 min buffer. GitHub expressions can't do arithmetic, so compute here.
           timeout_minutes=$(( crashing_time / 60 + 30 ))
@@ -80,6 +101,7 @@ jobs:
           echo "points_count=$points_count" >> $GITHUB_OUTPUT
           echo "timeout_minutes=$timeout_minutes" >> $GITHUB_OUTPUT
           echo "serverless_compatible=$serverless_compatible" >> $GITHUB_OUTPUT
+          echo "mode_label=$mode_label" >> $GITHUB_OUTPUT
       - name: Install minimal stable
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: Install mold
@@ -181,13 +203,13 @@ jobs:
           webhook-type: incoming-webhook
           payload: |
             {
-              "text": "Crasher run status: ${{ job.status }}",
+              "text": "Crasher run status${{ steps.default_inputs.outputs.mode_label }}: ${{ job.status }}",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Something is wrong.\nView the results <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|here>"
+                    "text": "Something is wrong${{ steps.default_inputs.outputs.mode_label }}.\nView the results <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|here>"
                   }
                 }
               ]
