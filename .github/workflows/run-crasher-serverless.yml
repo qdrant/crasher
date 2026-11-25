@@ -1,0 +1,14 @@
+name: Crash (serverless)
+
+on:
+  schedule:
+    # every day at 17:00 UTC
+    - cron: "0 17 * * *"
+
+jobs:
+  crash:
+    uses: ./.github/workflows/run-crasher.yml
+    with:
+      serverless_compatible: true
+    # Slack webhook for failure notifications
+    secrets: inherit

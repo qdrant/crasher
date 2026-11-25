@@ -4,10 +4,8 @@ on:
   push:
     branches: [ "*" ]
   schedule:
-    # every day at 14:00 UTC (default mode)
+    # every day at 14:00 UTC (default mode, serverless mode is scheduled in run-crasher-serverless.yml)
     - cron: "0 14 * * *"
-    # every day at 17:00 UTC (serverless_compatible mode)
-    - cron: "0 17 * * *"
   workflow_dispatch:
     inputs:
       qdrant_version:
@@ -24,6 +22,24 @@ on:
         default: 5000
       serverless_compatible:
         description: "Enable Qdrant's serverless_compatible feature-flag bundle"
+        type: boolean
+        default: false
+  # Lets other workflows (e.g. the scheduled serverless run) reuse this one with explicit inputs
+  workflow_call:
+    inputs:
+      qdrant_version:
+        type: string
+        default: dev
+      crashing_time:
+        type: string
+        default: "3600"
+      crash_probability:
+        type: string
+        default: "0.3"
+      points_count:
+        type: string
+        default: "5000"
+      serverless_compatible:
         type: boolean
         default: false
 
@@ -68,10 +84,6 @@ jobs:
           fi
 
           serverless_compatible="${{ inputs.serverless_compatible }}"
-          # Scheduled runs have no inputs: the second daily cron runs in serverless mode
-          if [ "${{ github.event.schedule }}" = "0 17 * * *" ]; then
-            serverless_compatible=true
-          fi
           if [ "$serverless_compatible" != "true" ]; then
             serverless_compatible=false
           fi
