@@ -3,9 +3,6 @@ name: Crash
 on:
   push:
     branches: [ "*" ]
-  schedule:
-    # every day at 14:00 UTC (default mode, serverless mode is scheduled in run-crasher-serverless.yml)
-    - cron: "0 14 * * *"
   workflow_dispatch:
     inputs:
       qdrant_version:
@@ -24,7 +21,7 @@ on:
         description: "Enable Qdrant's serverless_compatible feature-flag bundle"
         type: boolean
         default: false
-  # Lets other workflows (e.g. the scheduled serverless run) reuse this one with explicit inputs
+  # Called by the scheduled-*.yml workflows, which own the cron schedules
   workflow_call:
     inputs:
       qdrant_version:

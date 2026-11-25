@@ -1,0 +1,12 @@
+name: Crash (scheduled)
+
+on:
+  schedule:
+    # every day at 14:00 UTC
+    - cron: "0 14 * * *"
+
+jobs:
+  crash:
+    uses: ./.github/workflows/run-crasher.yml
+    # Slack webhook for failure notifications
+    secrets: inherit

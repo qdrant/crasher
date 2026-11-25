@@ -1,4 +1,4 @@
-name: Crash (serverless)
+name: Crash (scheduled, serverless)
 
 on:
   schedule:
